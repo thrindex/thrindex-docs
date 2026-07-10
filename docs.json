@@ -3,11 +3,11 @@
   "theme": "almond",
   "name": "THRINDEX",
   "colors": {
-    "primary": "#F4F1EC",
-    "light": "#F4F1EC",
-    "dark": "#E8E3DA"
+    "primary": "#141414",
+    "light": "#5C574F",
+    "dark": "#3D3A36"
   },
-  "favicon": "/logo/icon.png",
+  "favicon": "/logo/light.svg",
   "logo": {
     "light": "/logo/light.svg",
     "dark": "/logo/dark.svg"
