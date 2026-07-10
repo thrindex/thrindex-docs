@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "almond",
-  "name": "thrindex",
+  "name": "THRINDEX — The open compiler for spiking neuromorphic compute.",
   "colors": {
     "primary": "#F4F1EC",
     "light": "#F4F1EC",

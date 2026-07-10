@@ -1,10 +1,28 @@
 ---
-title: "THRINDEX"
-description: "A compiler and runtime for spiking neural networks. Author models in Python. Run them on neuromorphic hardware."
+title: "THRINDEX — The open compiler for spiking neuromorphic compute."
+description: "The open compiler for spiking neuromorphic compute. Author models in Python, compile to a sealed artifact, run on neuromorphic hardware."
 mode: "wide"
 ---
 
-THRINDEX is an open-source toolchain for spiking neural networks. You author models in Python using familiar PyTorch-style primitives, compile them to a sealed artifact, and run them through a behavioral simulator or a neuromorphic hardware backend — with the same command, the same output format, and the same conformance guarantee.
+# The open compiler for spiking neuromorphic compute.
+
+Author models in PyTorch. Compile to a sealed artifact. Run on the simulator or neuromorphic hardware — same command, same output, same conformance guarantee.
+
+<CardGroup cols={3}>
+  <Card title="Deterministic" icon="lock">
+    Seeded, reproducible, CRC32-sealed. The artifact is the spec and the implementation in one file.
+  </Card>
+  <Card title="Energy-proportional" icon="bolt">
+    Energy scales with spike count, not model size. Silent inputs cost nothing.
+  </Card>
+  <Card title="Hardware-portable" icon="microchip">
+    Compile once. Run on the simulator. Deploy the same artifact to neuromorphic silicon.
+  </Card>
+</CardGroup>
+
+---
+
+## From Python to hardware in three steps
 
 ```bash
 pip install thrindex
@@ -14,6 +32,7 @@ pip install thrindex
 import thrindex as thx
 import thrindex.snn as snn
 
+# 1. Author
 model = snn.Sequential(
     snn.Dense(700, 512),
     snn.LIF(tau_mem=20.0, threshold=0.3),
@@ -21,30 +40,63 @@ model = snn.Sequential(
     snn.LIF(tau_mem=20.0, threshold=0.3),
 )
 
+# 2. Compile — resolves tau_mem → alpha, seals with CRC32
 thx.compile(model, "model.thx")
 ```
 
 ```bash
+# 3. Run — simulator or hardware, same command
 thrindex run model.thx
 ```
 
+---
+
+## Built for systems where physics decides the stack
+
 <CardGroup cols={2}>
-  <Card title="Learn about SNNs" icon="brain" href="/learn/spiking-neural-networks">
-    Spiking neural networks from first principles — biology, mathematics, and code.
+  <Card title="Robotics" icon="robot" href="/systems/robotics">
+    Sub-millisecond sensor-to-actuator loops. The network is quiet when the arm is still.
   </Card>
-  <Card title="Get started" icon="rocket" href="/getting-started/installation">
-    Install THRINDEX and run your first model in under five minutes.
+  <Card title="Drones & UAVs" icon="plane" href="/systems/drones-uavs">
+    Energy scales with information rate. Onboard inference without GPU-class power.
   </Card>
-  <Card title="Tutorials" icon="code" href="/tutorials/keyword-spotting">
-    End-to-end examples: keyword spotting, event-camera vision, anomaly detection.
+  <Card title="Aerospace & Space" icon="satellite" href="/systems/aerospace-space">
+    Finite power for years. No cloud. Verifiable before launch. Sealed artifacts, forever.
   </Card>
-  <Card title="Conformance" icon="shield-check" href="/conformance/overview">
-    What THRINDEX Certified means and how backends earn the badge.
+  <Card title="Defense" icon="shield" href="/systems/defense">
+    Reproducible builds, offline verification, evidence packages auditors can review.
   </Card>
 </CardGroup>
 
+---
+
+## THRINDEX Certified
+
+Every hardware backend earns its badge by passing the conformance harness against `CONFORMANCE_ENVELOPE_V0` — a precisely derived bound on how far a backend's outputs can diverge from the float reference simulator.
+
+| Metric | Threshold | Meaning |
+|---|---|---|
+| `T_mean` | ≤ 0.020 | Mean spike-count error ≤ 2% |
+| `T_max` (p99) | ≤ 0.130 | Worst-neuron error ≤ 13% |
+| `P_pred` | ≥ 0.900 | ≥ 90% of predictions agree |
+
+The reference simulator passes with T_mean = 0, T_max = 0, P_pred = 1.0. The badge is a contract, not a claim.
+
+[Read the conformance spec →](/conformance/envelope-v0)
+
+---
+
 ## What THRINDEX is not
 
-- It is not a general-purpose deep learning framework. It targets spiking neural networks specifically.
-- It does not hide the spike raster. The output of every run is a structured transcript you can inspect, diff, and test.
-- It does not abstract away the hardware. It gives you a deterministic model of what will happen on the target, and a conformance guarantee that bounds the divergence from that model.
+- **Not a general-purpose framework.** It targets spiking neural networks on neuromorphic hardware specifically.
+- **Not a black box.** The output of every run is a structured transcript — spike counts, syn-ops, energy estimate — you can inspect, diff, and test.
+- **Not an abstraction over hardware.** It gives you a deterministic model of what will happen on the target, and a conformance bound on the divergence.
+
+<CardGroup cols={2}>
+  <Card title="Get started" icon="rocket" href="/getting-started/installation">
+    Install THRINDEX and run your first model in under five minutes.
+  </Card>
+  <Card title="Learn about SNNs" icon="brain" href="/learn/spiking-neural-networks">
+    Spiking neural networks from first principles — biology, mathematics, and code.
+  </Card>
+</CardGroup>
