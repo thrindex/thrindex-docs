@@ -1,0 +1,45 @@
+---
+title: "Robotics"
+description: "Sub-millisecond sensor-to-actuator loops. Event-driven activation — the network is quiet when the arm is still."
+---
+
+## The constraint
+
+Sub-millisecond sensor-to-actuator loops. Frame-based inference adds latency you cannot schedule around. A robot arm waiting 33ms for the next camera frame is a robot arm that drops things.
+
+## Why spiking networks
+
+**Timestep-native computation.** The SNN does not wait for a frame. It processes events as they arrive, updating membrane potentials and emitting spikes on the same clock as the sensor.
+
+**Event-driven activation.** When the arm is still, the scene does not change, sensors produce no events, and the network is silent. Energy consumption drops to near zero. When the arm moves and contact events arrive, the network wakes up proportionally to the information rate — not to a fixed clock.
+
+**On-device inference without cloud round-trips.** Reflex arcs do not go to the internet. They go to the motor controller, at the speed of the control loop.
+
+## Typical workloads
+
+- Tactile reflex on sparse contact events from skin-like pressure sensors
+- Motor coordination from proprioceptive event streams
+- Grasp planning on sparse contact geometry
+- Always-on manipulation monitoring with µW idle power
+
+## What THRINDEX provides
+
+**Authoring in Python.** Write the model in `thrindex.snn`, train with PyTorch, use the full ecosystem.
+
+**Deterministic simulator for validation.** Before any hardware is involved, validate the model's dynamics in software. The sealed artifact is the same object you validated — not a copy.
+
+**Conformance bound.** The hardware backend's divergence from the simulator is bounded by `CONFORMANCE_ENVELOPE_V0`. You know, quantitatively, how far the deployed behavior can differ from what you tested.
+
+**The pipeline:**
+
+```
+PyTorch authoring
+      ↓
+thrindex compile → model.thx
+      ↓
+thrindex run --target sim   ← validate, test, regression-test in CI
+      ↓
+thrindex run --target loihi2   ← deploy, same artifact
+```
+
+Same artifact. Sim and hardware are on the same conformance contract.

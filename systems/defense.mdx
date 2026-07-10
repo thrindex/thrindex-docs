@@ -1,0 +1,41 @@
+---
+title: "Defense"
+description: "Reproducible builds, offline verification, enclave deployment, and evidence packages auditors can review — not a Jupyter notebook."
+---
+
+## The constraint
+
+High-assurance programs require reproducible builds, offline verification, enclave deployment, and evidence packages auditors can review — not a Jupyter notebook on a laptop. The software must be trustworthy in the engineering sense: its behavior must be predictable, bounded, and documented.
+
+## Why spiking networks
+
+**Edge autonomy without connectivity.** A perimeter sensor, an autonomous platform, or a signals-intelligence processor that requires a cloud connection is a sensor that can be jammed, intercepted, or denied. Spiking networks run on-chip, air-gapped, without model weights leaving the enclave.
+
+**Low SWaP.** Size, weight, and power are always the constraint at the tactical edge. Neuromorphic inference is orders of magnitude more efficient per inference than GPU-class hardware at the same task, for the class of event-driven, sparse-signal workloads common in defense sensing.
+
+**On-chip adaptation (roadmap).** Learning on the edge — updating a model based on local data without transmitting weights — is on the neuromorphic roadmap and aligns with requirements for autonomous platforms in denied-communication environments.
+
+## Typical workloads
+
+- Signals intelligence edge processing: detecting patterns in RF event streams without transmitting raw data
+- Unattended perimeter sensing: always-on acoustic or seismic anomaly detection, weeks on battery
+- Pattern detection in EW-adjacent signal environments: sparse, high-dimensional event streams
+- Autonomous platform perception at the tactical edge: obstacle avoidance, target cueing, from event cameras
+
+## What THRINDEX provides
+
+**Reproducible builds.** The `.thx` artifact is deterministically produced from the source model and seed. Given the same Python model and `thx.compile()`, the output is bit-for-bit identical. Build reproducibility is architectural, not aspirational.
+
+**Offline verification.** The simulator runs without network access. `thrindex run` and `thrindex bench` work fully air-gapped. The conformance harness requires no cloud connection.
+
+**Structured evidence.** The conformance report is a machine-readable document with fixture fingerprint, metric values, envelope version, and pass/fail verdict. It is a file — it can be included in an evidence package, versioned, and re-generated against the same fixture set.
+
+**No telemetry by default.** The THRINDEX toolchain does not phone home. There are no usage metrics, no model upload endpoints, no dependency on external services at inference time. The artifact is self-contained and executes locally.
+
+**Open SDK — program-specific work segregated.** The open SDK stays generic. Program-specific models, weights, and training data are kept in your infrastructure. THRINDEX is the toolchain, not the model.
+
+## Security disclosure
+
+Security issues in THRINDEX are disclosed at [github.com/thrindex/thrindex/security](https://github.com/thrindex/thrindex/security). There is no private channel for vulnerability disclosure at this stage of the project.
+
+For program-specific security requirements, contact us directly.

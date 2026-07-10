@@ -1,0 +1,50 @@
+---
+title: "Drones & UAVs"
+description: "Every gram of battery is flight time. Onboard inference must fit a watt budget, not a datacenter budget."
+---
+
+## The constraint
+
+Every gram of battery is flight time. Onboard inference must fit a watt budget — not a datacenter budget — and it must run continuously without connectivity. A hovering drone with a quiet scene should not burn GPU-class power on static frames.
+
+## Why spiking networks
+
+**Energy scales with information rate.** In a static hover over empty terrain, an event camera produces almost no events. The SNN's energy consumption is nearly zero. When an obstacle appears — sudden motion, a bird, a wire — events spike, the network activates, and the response is immediate.
+
+On a conventional CNN running at 30 fps, none of this happens. Every frame is processed at full cost, regardless of what is in it.
+
+**Weight-efficient inference.** A neuromorphic chip adds grams, not kilograms. The compute budget is in power, not mass.
+
+**Always-on gating.** A lightweight SNN can run continuously as a gating layer, waking a heavier perception model only when something warranting attention appears. The combined system is far more efficient than running the heavy model continuously.
+
+## Typical workloads
+
+- Obstacle detection on event cameras (DVS sensors)
+- Acoustic keyword spotting for voice-controlled UAV operations
+- Vibration anomaly detection on airframe (structural health)
+- Low-power gating before waking a heavier perception model
+
+## What THRINDEX provides
+
+**Modeled energy per inference in CI.** Every `thrindex run` outputs an estimated energy figure in pJ. This number is part of the artifact transcript — you can track it across model versions and set a budget in CI.
+
+```bash
+thrindex run model.thx
+# ...
+# energy_pJ: 124800
+```
+
+**Event-native templates.** The `templates/event-camera/` template implements the complete pipeline from DVS sensor events to compiled artifact: preprocessing, encoding, training, compile. Start from a working model, not from scratch.
+
+**Same artifact from bench to airframe.** The `.thx` artifact runs identically on the behavioral simulator (on your development machine) and on the neuromorphic chip (on the airframe). No reimplementation. No port. Compile once, validate on sim, deploy the same file.
+
+## Energy example
+
+A `Dense(700→512) → LIF → Dense(512→20) → LIF` model at 5% firing rate:
+
+```
+syn-ops = 700 × 512 × 0.05 × T  +  512 × 20 × 0.05 × T
+energy  = syn-ops × 0.5 pJ/syn-op
+```
+
+At T=100, this is approximately **0.9 µJ per inference** — competitive with purpose-built DSPs, without custom silicon design effort.

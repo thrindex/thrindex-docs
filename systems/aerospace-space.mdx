@@ -1,0 +1,49 @@
+---
+title: "Aerospace & Space"
+description: "Finite power for years. No cloud. No field service. Software must be verifiable before launch."
+---
+
+## The constraint
+
+Finite power for years. No cloud. No field service. Software must be verifiable before launch — you cannot push a patch to something in orbit, and you cannot ask the spacecraft to phone home for inference.
+
+The verification requirement is not bureaucratic. It is engineering. A system that cannot be verified offline cannot be trusted with a payload worth millions, deployed somewhere it cannot be reached.
+
+## Why spiking networks
+
+**µW-class always-on sensing.** A payload health monitor or star tracker gate that runs continuously for years cannot afford to run a GPU. Neuromorphic chips in deep-sleep mode consume microwatts. Spiking networks are silent when nothing is happening — which, on a spacecraft in cruise, is most of the time.
+
+**Deterministic execution.** With a seeded RNG and a sealed artifact, every inference is reproducible. Given the same input, the simulator and the hardware produce the same output, within the conformance bound. This is a property of the design, not a claim made after the fact.
+
+**Frozen artifacts, verifiable forever.** The `.thx` artifact is a sealed, CRC32-verified file. The weights, architecture, and resolved runtime constants are fixed at compile time. The same artifact can be re-verified on the ground, years after launch, against the same simulator. If the behavior is different, you know — the CRC32 tells you.
+
+## Typical workloads
+
+- Payload health monitoring: continuous sensing of temperature, vibration, power draw against a learned normal model
+- Star tracker gating: lightweight SNN as a pre-filter, waking the main tracker only when the attitude has changed significantly
+- Structural vibration monitoring: anomaly detection on sparse accelerometer events
+- Onboard sensor fusion at the edge of connectivity: integrate multi-modal event streams without ground-station round trips
+
+## What THRINDEX provides
+
+**The `.thx` artifact as deployment contract.** The artifact contains everything: architecture, weights, resolved constants, CRC32 integrity hash. It is the specification and the implementation in one file.
+
+**Compile once, verify forever.**
+
+```bash
+# On the ground, before launch
+thrindex doctor --check payload_model.thx
+# artifact: payload_model.thx
+# format:   m3  (current)
+# crc32:    OK  (d3a4f82c)
+
+# Three years later, in the archive
+thrindex run payload_model.thx --input archive_sample.json
+# Produces identical output to the pre-launch simulation run
+```
+
+**Traceability-oriented engineering from day one.** The conformance report is a structured, machine-readable document. The fixture fingerprint, the measured metric values, and the envelope version are all in the artifact transcript — not in a spreadsheet.
+
+## On radiation tolerance
+
+Neuromorphic digital chips are CMOS logic. Radiation tolerance is a function of the specific chip's process, shielding design, and orbital environment — not a property of THRINDEX. THRINDEX does not make claims about radiation tolerance. Use the appropriate radiation-hardened substrate for your orbit.
