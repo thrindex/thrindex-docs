@@ -1,0 +1,64 @@
+---
+title: "Neuromorphic Hardware"
+description: "What neuromorphic processors actually do, the classes of existing systems, and how THRINDEX maps to them."
+---
+
+## What makes hardware neuromorphic
+
+A neuromorphic processor implements the integrate-and-fire dynamics — accumulate input, compare to threshold, emit a spike — directly in silicon rather than in software running on a general-purpose core. The result is a chip that:
+
+- Consumes energy only when a spike propagates (event-driven, not clock-driven)
+- Processes spikes in parallel across many neuron cores simultaneously
+- Maintains membrane state in local memory, avoiding the data movement that dominates GPU energy budgets
+
+These properties are not approximations of what a GPU does. They are a fundamentally different computational substrate, matched to the computational pattern of an SNN.
+
+## Three classes of systems
+
+**Digital synchronous** (Intel Loihi 2, IBM TrueNorth). Neurons are simulated in digital logic, synchronized by a clock. Memory is distributed across cores. Spikes are routed as packets between cores. The integrate-and-fire equation is computed in fixed-point arithmetic. Deterministic, programmable, and the easiest class to verify against a software simulator.
+
+**Mixed-signal / analog** (BrainScaleS, SpiNNaker 2's analog neurons). The membrane potential is a physical voltage on a capacitor. Integration is done by leakage and charging currents. Faster than real time by many orders of magnitude. Harder to control precisely because analog circuits vary with temperature and process variation. Calibration (matching the physical dynamics to the intended model) is a significant engineering problem.
+
+**Photonic / emerging** (research systems using optical interconnects or memristive devices). Not yet in production. Relevant for understanding where the field is heading.
+
+THRINDEX targets class 1 (digital synchronous) in M6. Class 2 requires chip-specific calibration infrastructure that is on the roadmap.
+
+## The capability descriptor
+
+Every backend in THRINDEX declares a `Capability` struct that describes what it can do:
+
+```rust
+Capability {
+    name: "loihi2",
+    native_dt_ms: 1.0,
+    native_delay_max_steps: 63,
+    delay_fallback: DelayFallback::Reject,
+    precision: Precision::Fixed16,
+}
+```
+
+The compiler reads this descriptor and decides whether to retime (if `dt` differs), emulate delays (if the hardware doesn't support them natively), or reject (if the model cannot be mapped to the target). You see these decisions as advisories in `thrindex compile` output.
+
+## Why the simulator matters
+
+The behavioral simulator (`thrindex-sim`) is not a stand-in for hardware — it is the reference implementation against which hardware backends are certified. The simulator runs in f32, the hardware runs in fixed-point or analog; the THRINDEX Certified badge means the hardware's outputs match the simulator's outputs within the `CONFORMANCE_ENVELOPE_V0` thresholds.
+
+This means you can:
+1. Author a model on any machine, in pure Python.
+2. Verify it with the simulator.
+3. Compile it to a hardware target.
+4. Know, quantitatively, how far the hardware's behavior can deviate from what you tested.
+
+The conformance envelope is the contract between the simulator and the hardware. It is not a claim that the hardware is equivalent to the simulator — it is a precisely stated bound on the divergence.
+
+## Energy: what the claim means
+
+Neuromorphic hardware's energy advantage over GPUs is real but context-dependent. THRINDEX reports modeled energy as:
+
+```
+energy = spike_count × fanout × coefficient
+```
+
+The `coefficient` (default: 1 pJ per synaptic operation) is a coarse model of the energy cost of a single spike propagation on a digital neuromorphic chip. Real chips vary from 0.1 pJ to 10 pJ per synaptic operation depending on architecture and operating point.
+
+This number is a rough estimate for design exploration, not a silicon measurement. The [energy model documentation](/learn/energy-model) explains the formula, the default coefficient, and how to calibrate it for a specific chip once you have hardware numbers.

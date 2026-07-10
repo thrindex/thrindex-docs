@@ -1,0 +1,32 @@
+---
+title: "E0102 — RetimingDelayNotInteger"
+description: "A synaptic delay cannot be retimed to the target's dt because the scaled value is not an integer."
+---
+
+<Warning>E0102: synaptic delay cannot be retimed</Warning>
+
+## What happened
+
+The model uses synaptic delays authored at `authored_dt`. The compilation target uses a different `target_dt`. Retiming the delay from `authored_dt` to `target_dt` produces a non-integer number of steps, which cannot be represented.
+
+## Why
+
+Delays are integer multiples of `dt`. If you scale `delay_steps` by `authored_dt / target_dt`, you must get an integer. For example:
+
+- `delay=3` at `dt=1ms` → at `dt=2ms` → `3 × (1/2) = 1.5` — not an integer. **Fails.**
+- `delay=4` at `dt=1ms` → at `dt=2ms` → `4 × (1/2) = 2` — integer. **OK.**
+
+## How to fix
+
+1. **Author the model at the target's native dt**: set `dt=target_dt` in the model. Then delays are written directly in the target's step units.
+2. **Choose delays that divide evenly**: if `target_dt = authored_dt × k`, use delays that are multiples of `k`.
+3. **Use the `sim` target**: the simulator accepts any `dt` and runs delays exactly as authored.
+
+## Example
+
+```
+E0102: synaptic delay cannot be retimed in layer 0 connection 127
+Why: delay_steps=3 × (authored_dt=1.0000 ms / target_dt=2.0000 ms) = 1.500000 is not an integer.
+Fix: use a delay that is an integer multiple of target_dt / authored_dt, or author the model at target_dt directly.
+Docs: https://docs.thrindex.com/errors/E0102
+```

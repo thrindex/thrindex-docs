@@ -1,0 +1,120 @@
+---
+title: "Keyword Spotting on SHD"
+description: "Train a spiking neural network on the Spiking Heidelberg Digits dataset. A complete end-to-end walkthrough."
+---
+
+## Dataset
+
+The [Spiking Heidelberg Digits (SHD)](https://zenkelab.org/resources/spiking-heidelberg-datasets/) dataset contains recordings of spoken digits (0–9 in English and German, 20 classes total) converted to spike trains by a cochlear model. Each sample consists of events from 700 auditory channels over a variable duration.
+
+The dataset is available under CC BY 4.0.
+
+| Property | Value |
+|---|---|
+| Classes | 20 (10 digits × 2 languages) |
+| Input channels | 700 cochlea channels |
+| Training samples | 8,156 |
+| Test samples | 2,264 |
+| Event format | `(timestamp_s, channel_index)` pairs |
+
+## Architecture
+
+```
+Dense(700 → 512) → LIF(τ_mem=20ms, threshold=0.3) → Dense(512 → 20) → LIF(τ_mem=20ms, threshold=0.3)
+```
+
+Two hidden layers, feedforward, no recurrence. This matches the architecture class in Zheng et al. 2025's "without conditions" category.
+
+**Why threshold=0.3?** SHD has ~0.3–0.7% spike density per bin — about 20× sparser than rate-encoded image data. A threshold of 1.0 (suited for dense inputs) produces zero firing on SHD: neurons never accumulate enough charge to spike, and no gradient flows. 0.3 places the firing threshold where surrogate gradients can flow from the first epoch.
+
+## Preprocessing
+
+Each SHD sample is a stream of `(time_s, channel)` events. We bin them into T=100 discrete timesteps at 14 ms per bin (matching the 1.4s maximum sample duration):
+
+```python
+def bin_sample(spike_times, spike_units, T=100, max_time=1.4):
+    dt = max_time / T
+    dense = torch.zeros(T, 700)
+    for t_s, u in zip(spike_times, spike_units):
+        t = min(int(t_s / dt), T - 1)
+        if u < 700:
+            dense[t, u] = 1.0
+    return dense
+```
+
+Multiple spikes in the same bin and channel are deduplicated (the bin is already 1.0 after the first event).
+
+## Training
+
+The complete training script is at `templates/keyword-spotting/train.py`. Key hyperparameters:
+
+| Parameter | Value |
+|---|---|
+| Optimizer | Adam |
+| Learning rate | 1×10⁻³ |
+| Gradient clip | norm ≤ 5.0 |
+| Batch size | 64 |
+| Epochs | 100 |
+| Loss | Cross-entropy on mean firing rates |
+
+```python
+import thrindex.snn as snn
+from thrindex.train import rate_loss
+
+model = snn.Sequential(
+    snn.Dense(700, 512),
+    snn.LIF(tau_mem=20.0, threshold=0.3),
+    snn.Dense(512, 20),
+    snn.LIF(tau_mem=20.0, threshold=0.3),
+)
+
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+
+for x, y in train_loader:
+    out = model(x)
+    loss = rate_loss(out, y)
+    loss.backward()
+    torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
+    optimizer.step()
+    optimizer.zero_grad()
+```
+
+```bash
+uv run python templates/keyword-spotting/train.py \
+    --data-dir /tmp/shd --epochs 100
+```
+
+The script downloads the dataset automatically on first run.
+
+## Results
+
+| Run | Test accuracy | Hardware |
+|---|---|---|
+| thrindex M2 (2026-07-09) | **64.66%** | Apple M4 Pro (MPS) |
+
+**Reference band (Zheng et al. 2025, feedforward LIF without special conditions):** 63.2–74.8%.
+
+The committed result sits within this band, confirming the surrogate-gradient LIF implementation is correct for sparse event-based inputs. See [benchmarks/spiking-heidelberg-digits](/benchmarks/spiking-heidelberg-digits) for the full epoch curve and comparisons.
+
+## Learning curve highlights
+
+The network learns rapidly in the first 14 epochs (21% → 64.66% best) and then enters a noisy plateau. This is characteristic of feedforward LIF on SHD: the small training set (8,156 samples) and absence of regularisation limit further gains. The best checkpoint is saved and compiled.
+
+## Compile and run
+
+```python
+import thrindex as thx
+thx.compile(model, "templates/keyword-spotting/model.thx")
+```
+
+```bash
+thrindex run templates/keyword-spotting/model.thx
+```
+
+The artifact at `templates/keyword-spotting/model.thx` contains the weights from the committed training run. Three real SHD test samples are bundled in `templates/keyword-spotting/samples/` for offline inference.
+
+## What to try next
+
+- Increase hidden size to 1024 and observe the accuracy improvement.
+- Add a learning rate schedule (`CosineAnnealingLR`) — empirically improves stability after epoch 30.
+- Reduce `tau_mem` to 10ms and observe faster but noisier dynamics.

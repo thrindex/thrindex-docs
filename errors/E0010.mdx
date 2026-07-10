@@ -1,0 +1,33 @@
+---
+title: "E0010 — InputDimensionMismatch"
+description: "The input spike raster has a different feature count than the model's first layer."
+---
+
+<Warning>E0010: input dimension mismatch</Warning>
+
+## What happened
+
+You passed a spike raster with `got` input features to a model that expects `expected` input features. The dimensions do not match and the model cannot run.
+
+## Why
+
+The model was compiled for a specific input size (e.g. 700 for SHD). The input you provided has a different number of features.
+
+## How to fix
+
+1. **Check your encoder output shape.** The raster shape should be `[T, n_features]` where `n_features` matches the first layer's `in_features`.
+2. If you are using `thrindex.encoders`, verify the `n_channels` parameter matches the model architecture.
+3. If you are building input manually, check that you are not transposing T and N dimensions.
+
+## Example
+
+```
+E0010: input dimension mismatch: model expects 700 input neurons, got 784.
+Why: the input spike train does not match the model's first layer.
+Fix: verify your encoder output shape matches the model architecture.
+Docs: https://docs.thrindex.com/errors/E0010
+```
+
+## Common mistake
+
+MNIST has 784 pixels. SHD has 700 cochlear channels. If you accidentally pass an MNIST-encoded input to an SHD model, you get this error.

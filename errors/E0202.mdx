@@ -1,0 +1,29 @@
+---
+title: "E0202 — InputShapeMismatch (backend)"
+description: "The input tensor was prepared for a different model than the one being run."
+---
+
+<Warning>E0202: input shape mismatch</Warning>
+
+## What happened
+
+A hardware backend received an input tensor with `got` features per timestep, but the model's first layer expects `expected` features.
+
+## Why
+
+The input was encoded or resized for a different model. Each compiled artifact has a fixed input dimension (stored in the first layer's `in_features`). If the encoder was configured for a different model size, the input will not match.
+
+## How to fix
+
+1. Use `thrindex.encoders` with the correct `n_channels` matching the model's first layer.
+2. Check the artifact's input dimension: `thrindex doctor --check model.thx` prints `Dense N → M` for the first layer; `N` is the required input feature count.
+3. Confirm you are loading the correct artifact for your encoder configuration.
+
+## Example
+
+```
+E0202: input shape mismatch — expected 700 features, got 784
+Why: the input tensor was prepared for a different model
+Fix: re-encode inputs using `thrindex.encoders` with the model's declared input size
+Docs: https://docs.thrindex.com/errors/E0202
+```

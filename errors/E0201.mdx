@@ -1,0 +1,32 @@
+---
+title: "E0201 — ArtifactParse (backend)"
+description: "A hardware backend could not parse or resolve the artifact."
+---
+
+<Warning>E0201: backend could not parse artifact</Warning>
+
+## What happened
+
+A registered hardware backend attempted to load a `.thx` artifact and failed. The artifact JSON could not be parsed or the backend could not resolve its structure into a runnable model.
+
+## Why
+
+Possible causes:
+- The artifact was compiled for a different target (e.g. `sim` artifact passed to a hardware backend that requires target-specific fields)
+- The artifact is corrupt (see [E0008](/errors/E0008), [E0009](/errors/E0009))
+- The backend implements an older API that does not support the current artifact format version
+
+## How to fix
+
+1. **Recompile for the correct target**: `thx.compile(model, "model.thx", target="loihi2")`.
+2. **Verify the artifact is valid**: `thrindex doctor --check model.thx`.
+3. **Check backend compatibility**: ensure the backend driver version matches the artifact format version.
+
+## Example
+
+```
+E0201: backend could not parse artifact
+Why: missing required field `loihi2_core_map` — artifact was not compiled for this target
+Fix: verify the artifact was produced by `thrindex compile --target loihi2` and is not corrupted
+Docs: https://docs.thrindex.com/errors/E0201
+```

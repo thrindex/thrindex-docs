@@ -1,0 +1,34 @@
+---
+title: "E0001 — ArtifactNotFound"
+description: "The .thx artifact file could not be read from disk."
+---
+
+<Warning>E0001: artifact file not found</Warning>
+
+## What happened
+
+The `.thx` file at the specified path does not exist or cannot be read.
+
+## Why
+
+The path does not exist, the file was moved or deleted, or the current user lacks read permission.
+
+## How to fix
+
+1. Check the path: `ls -la <path>`. Confirm the file exists.
+2. Check permissions: `stat <path>`. The file must be readable by the current user.
+3. If you recently compiled the model, verify `thx.compile()` completed without error and the output path matches the path you are passing to `thrindex run`.
+4. If the file is on a network drive, check that the drive is mounted.
+
+## Example
+
+```
+E0001: artifact file not found: /tmp/model.thx
+Why: the path does not exist or is not readable.
+Fix: check the path with `ls /tmp/model.thx` and verify file permissions.
+Docs: https://docs.thrindex.com/errors/E0001
+```
+
+## Related
+
+- [E0009](/errors/E0009) — file found but CRC32 integrity check failed

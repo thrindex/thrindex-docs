@@ -1,0 +1,101 @@
+---
+title: "Event-Camera Vision"
+description: "Train a convolutional spiking network on N-MNIST — neuromorphic event-camera data."
+---
+
+## What event cameras produce
+
+A conventional camera captures a full frame at a fixed rate. An event camera (dynamic vision sensor, DVS) outputs asynchronous events — each pixel fires independently when its brightness changes, producing a stream of `(timestamp, x, y, polarity)` tuples.
+
+This is intrinsically spiking data: sparse, asynchronous, and event-driven. An SNN is a natural fit.
+
+## Dataset: N-MNIST
+
+[Neuromorphic MNIST (N-MNIST)](https://www.garrickorchard.com/datasets/n-mnist) is the MNIST handwritten digit dataset recorded using a DVS camera moving in saccadic patterns. Each digit generates a stream of ON-polarity (brightness increase) and OFF-polarity (brightness decrease) events.
+
+| Property | Value |
+|---|---|
+| Classes | 10 (digits 0–9) |
+| Training samples | 60,000 |
+| Test samples | 10,000 |
+| Sensor resolution | 34 × 34 pixels |
+| Event format | `(timestamp_μs, x, y, polarity)` |
+| License | Creative Commons |
+
+## Preprocessing
+
+Events are binned into T=20 frames of 2 input channels (ON and OFF polarity) at 34×34 spatial resolution:
+
+```python
+def events_to_frames(events, T=20, H=34, W=34):
+    duration = events['t'][-1] - events['t'][0]
+    dt = duration / T
+    frames = torch.zeros(T, 2, H, W)
+    for t_us, x, y, p in zip(events['t'], events['x'], events['y'], events['p']):
+        t_bin = min(int((t_us - events['t'][0]) / dt), T - 1)
+        frames[t_bin, p, y, x] = 1.0
+    return frames
+```
+
+Each frame is a 2-channel binary image: channel 0 is OFF events, channel 1 is ON events. This is the natural representation for a 2-polarity DVS.
+
+## Architecture
+
+```
+Conv2d(2, 32, 3) → LIF(τ_mem=10ms) → Conv2d(32, 64, 3) → LIF(τ_mem=10ms)
+  → Dense(64×6×6, 128) → LIF(τ_mem=10ms) → Dense(128, 10) → LIF(τ_mem=10ms)
+```
+
+Four layers: two convolutional LIF layers for spatial feature extraction, two dense LIF layers for classification.
+
+```python
+import thrindex.snn as snn
+
+model = snn.Sequential(
+    snn.Conv2d(2, 32, kernel_size=3, padding=0),
+    snn.LIF(tau_mem=10.0, threshold=0.5),
+    snn.Conv2d(32, 64, kernel_size=3, padding=0),
+    snn.LIF(tau_mem=10.0, threshold=0.5),
+    snn.Flatten(),
+    snn.Dense(64 * 6 * 6, 128),
+    snn.LIF(tau_mem=10.0, threshold=0.5),
+    snn.Dense(128, 10),
+    snn.LIF(tau_mem=10.0, threshold=0.5),
+)
+```
+
+After two 3×3 convolutions on a 34×34 input, the spatial dimension is 30×30 → 28×28... the exact spatial size after pooling depends on the specific architecture variant. The complete script in `templates/event-camera/train.py` handles the flattening correctly.
+
+## Training
+
+```bash
+uv run python templates/event-camera/train.py \
+    --data-dir /tmp/nmnist --epochs 20
+```
+
+N-MNIST is a relatively straightforward dataset for SNNs. Published results with convolutional spiking networks reach 98.5–99.5%.
+
+**Committed accuracy floor: ≥ 98.0%.** See [benchmarks/event-camera](/benchmarks/mnist) for the committed result.
+
+## Why this demonstrates something different
+
+The keyword-spotting tutorial shows rate-coded temporal audio. This tutorial shows:
+
+- **Spatial structure**: `snn.Conv2d` layers with weight sharing across positions
+- **Polarity encoding**: two input channels representing signed event polarities
+- **2D spike rasters**: the input is `[T, 2, H, W]` rather than `[T, N]`
+
+The `.thx` artifact format handles Conv2d layers natively. Convolution weights are stored as base64-encoded `[out_channels, in_channels, kH, kW]` tensors.
+
+## Compile and run
+
+```python
+import thrindex as thx
+thx.compile(model, "templates/event-camera/model.thx")
+```
+
+```bash
+thrindex run templates/event-camera/model.thx
+```
+
+Three real N-MNIST test samples are bundled in `templates/event-camera/samples/` for offline inference.

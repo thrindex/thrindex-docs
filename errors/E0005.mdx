@@ -1,0 +1,35 @@
+---
+title: "E0005 — InvalidLifParam"
+description: "A LIF layer in the artifact has a parameter value outside the valid range."
+---
+
+<Warning>E0005: invalid LIF parameter</Warning>
+
+## What happened
+
+A LIF layer in the artifact has a parameter (`alpha`, `threshold`, or `beta`) with a value that the simulator cannot use.
+
+## Why
+
+Common causes:
+- `alpha` is not in `(0, 1)` — this means the leak factor is non-physical (exponential amplification or no decay)
+- `threshold` is ≤ 0 — a non-positive threshold fires immediately or never
+- `beta` is not in `(0, 1)` — same issue as `alpha` for the synaptic filter
+
+## How to fix
+
+1. Check the model's `tau_mem` and `dt` values. If `tau_mem` is very small relative to `dt`, `alpha = exp(-dt/tau_mem)` approaches 0 and the compiler should have raised [E0101](/errors/E0101). If you see E0005 at runtime, the artifact may be from an older compiler build that did not validate this.
+2. Recompile with the current thrindex version: `thx.compile(model, "model.thx")`.
+
+## Example
+
+```
+E0005: invalid LIF parameter in layer 1: alpha=0.0
+Why: alpha must be in (0, 1); value 0.0 would produce a trivial neuron.
+Fix: set tau_mem > dt when constructing the LIF layer.
+Docs: https://docs.thrindex.com/errors/E0005
+```
+
+## Related
+
+- [E0101](/errors/E0101) — the compiler-time check for `tau_mem ≤ dt`

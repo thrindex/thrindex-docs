@@ -1,0 +1,28 @@
+---
+title: "E0109 — DelayLengthMismatch"
+description: "The delay array for a Dense layer has the wrong number of entries."
+---
+
+<Warning>E0109: delay array length mismatch</Warning>
+
+## What happened
+
+A Dense layer with delays enabled has a delay array whose length does not equal `in_features × out_features`. The delay array must have exactly one entry per connection.
+
+## Why
+
+The delay array is corrupt in the Graph IR. This should not occur if the model was built with `snn.Dense(..., delays=True)` using a current version of the Python SDK. If it does occur, there is a serialization bug.
+
+## How to fix
+
+1. **Recompile** the model from Python: `thx.compile(model, "model.thx")`.
+2. If the error persists across fresh compilations, file a bug report — this indicates a serialization bug in the Python SDK.
+
+## Example
+
+```
+E0109: delay array length mismatch in layer 0
+Why: a dense delay array must have exactly in_features × out_features = 358400 entries, but it has 358399 entries.
+Fix: recompile the model — the Graph IR delay data may be corrupt.
+Docs: https://docs.thrindex.com/errors/E0109
+```

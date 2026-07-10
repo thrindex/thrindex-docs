@@ -1,0 +1,50 @@
+---
+title: "E0106 — DimensionMismatch (compiler)"
+description: "Two consecutive layers have incompatible dimensions."
+---
+
+<Warning>E0106: layer dimension mismatch</Warning>
+
+## What happened
+
+During the compiler's validate pass, it found that layer `N` expects `expected` input features, but layer `N-1` produces `got` output features. The two layers cannot be connected.
+
+## Why
+
+The most common cause: you changed the size of one layer but forgot to update the adjacent layer.
+
+For example:
+
+```python
+# Bug: Dense(512, 20) can't connect to LIF that was set up for 256 outputs
+model = snn.Sequential(
+    snn.Dense(700, 256),   # outputs 256
+    snn.LIF(tau_mem=20.0, threshold=0.3),
+    snn.Dense(512, 20),    # expects 512 but gets 256
+    snn.LIF(tau_mem=20.0, threshold=0.3),
+)
+```
+
+## How to fix
+
+1. Check each `Dense` layer — `out_features` of layer `N` must match `in_features` of layer `N+2` (accounting for the LIF layer in between).
+2. Use a consistent naming pattern, e.g. `hidden_size = 512`, and reference the variable throughout:
+
+```python
+hidden_size = 512
+model = snn.Sequential(
+    snn.Dense(700, hidden_size),
+    snn.LIF(tau_mem=20.0, threshold=0.3),
+    snn.Dense(hidden_size, 20),
+    snn.LIF(tau_mem=20.0, threshold=0.3),
+)
+```
+
+## Example
+
+```
+E0106: layer dimension mismatch at layer 2
+Why: layer 2 declares 512 input features but layer 1 produces 256 output features.
+Fix: recheck the architecture — input/output sizes must chain correctly.
+Docs: https://docs.thrindex.com/errors/E0106
+```

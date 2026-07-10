@@ -1,0 +1,31 @@
+---
+title: "E0206 — OutputShapeMismatch (harness)"
+description: "The backend under test returned an output raster with different dimensions than the reference on a specific sample."
+---
+
+<Warning>E0206: backend output shape mismatch on sample N</Warning>
+
+## What happened
+
+During a conformance harness run, the backend under test returned an output raster for sample `N` with different dimensions than the reference simulator output. The reference output was `[ref_t × ref_n]`, the backend returned `[got_t × got_n]`.
+
+## Why
+
+The backend implementation does not produce the correct output shape for this sample. Possible causes:
+- Off-by-one in T unrolling
+- The backend silently skips empty input timesteps
+- The backend trims trailing zero-spike timesteps
+
+## How to fix
+
+1. In your backend's `run_batch` implementation, ensure the output tensor has shape `[batch, T, N_out]` where `T` and `N_out` are taken from the artifact — not from the input data.
+2. The output shape must be fixed by the model, not by the input activity.
+
+## Example
+
+```
+E0206: backend output shape mismatch on sample 7 — reference [100×20], backend [99×20]
+Why: the backend returned a different number of timesteps or output neurons
+Fix: verify the backend runs exactly T=100 timesteps and produces N_out=20 neurons per the artifact
+Docs: https://docs.thrindex.com/errors/E0206
+```

@@ -1,0 +1,86 @@
+---
+title: "Spiking Neural Networks"
+description: "What spiking neural networks are, how they differ from conventional deep learning, and why the distinction matters."
+---
+
+## The core idea
+
+A conventional neural network computes a continuous activation for every neuron on every forward pass. A spiking neural network (SNN) computes discrete binary events — spikes — that propagate through the network over time.
+
+The difference is not cosmetic. In a conventional network, all neurons are always active. In an SNN, most neurons are silent most of the time. Computation happens only when a spike occurs.
+
+This changes three things at once:
+
+1. **Energy consumption.** A synapse consumes energy only when it processes a spike. If a neuron fires rarely, its downstream connections cost almost nothing.
+2. **Temporal representation.** The timing of a spike carries information. A network can encode not just whether something happened, but when.
+3. **Hardware mapping.** Neuromorphic processors — purpose-built silicon — implement the spike-and-integrate model directly in analog circuits or digital state machines, executing SNNs orders of magnitude more efficiently than a GPU running conventional matrix operations.
+
+## Biological origin
+
+The brain's neurons operate on this principle. A neuron accumulates charge from its inputs (dendrites) and emits a spike (action potential) when that charge crosses a threshold. The spike travels along the axon, triggering synaptic events in downstream neurons, and the membrane potential resets.
+
+SNNs are a mathematical abstraction of this process — not a simulation of biology, but a computational model that preserves the key properties: event-driven computation, sparse activity, and temporal dynamics.
+
+## The rate code and the temporal code
+
+There are two primary ways a population of spikes carries information:
+
+**Rate coding.** The quantity of spikes over a time window represents the signal. A neuron firing 80 times per 100 ms encodes a stronger signal than one firing 20 times. This is the dominant coding scheme in practice and the one most amenable to training with gradient descent.
+
+**Temporal coding.** The precise timing of the first spike (or the interval between spikes) carries the information. Temporal codes are theoretically more information-dense but harder to train.
+
+THRINDEX currently targets rate coding. The time dimension `T` (number of timesteps) is explicit in every model and every artifact.
+
+## How they are trained
+
+Conventional backpropagation requires a differentiable activation function. The spike — a step function at a threshold — has a derivative of zero everywhere except the threshold itself, where it is undefined.
+
+The solution is surrogate gradients: during the backward pass, the step function is replaced by a smooth approximation (commonly a fast sigmoid or a piecewise linear function). The forward pass remains discrete and correct; only the gradient signal is smoothed.
+
+This makes the entire standard PyTorch training loop available to SNNs:
+
+```python
+import torch
+import thrindex.snn as snn
+
+lif = snn.LIF(tau_mem=20.0, threshold=1.0)
+
+# Forward: spikes (discrete, 0 or 1)
+spikes = lif(membrane_potential)
+
+# Backward: surrogate gradient flows normally
+loss = rate_loss(spikes, targets)
+loss.backward()
+```
+
+The surrogate is applied automatically by the THRINDEX autograd layer. You do not configure it separately.
+
+## SNN vs. conventional networks: when to use which
+
+| Property | Conventional (ANN) | Spiking (SNN) |
+|---|---|---|
+| Activation | Continuous | Binary (0 or 1 per timestep) |
+| Temporal dynamics | None by default | Intrinsic (membrane potential) |
+| Energy per inference | Proportional to model size | Proportional to spike count |
+| Training maturity | Extensive ecosystem | Narrower, improving rapidly |
+| Hardware target | GPU, CPU | Neuromorphic silicon, CPU sim |
+| Best for | General tasks, high accuracy | Low-power, event-driven, temporal |
+
+SNNs are not universally better. On a GPU, running an SNN naively is slower than an equivalent ANN because sparse binary operations are not what GPU tensor cores are designed for. The advantage emerges on neuromorphic hardware or in applications where event-driven sparsity is a first-class constraint.
+
+## Further reading in this section
+
+<CardGroup cols={2}>
+  <Card title="The LIF neuron" href="/learn/leaky-integrate-and-fire">
+    The mathematical model behind `snn.LIF`: membrane equation, threshold, reset.
+  </Card>
+  <Card title="Surrogate gradients" href="/learn/surrogate-gradients">
+    How backpropagation works through a non-differentiable spike function.
+  </Card>
+  <Card title="Time in SNNs" href="/learn/time-in-snn">
+    Timesteps, dt, discrete rasters, and why they matter for hardware.
+  </Card>
+  <Card title="Neuromorphic hardware" href="/learn/neuromorphic-hardware">
+    What neuromorphic processors actually do and how THRINDEX maps to them.
+  </Card>
+</CardGroup>

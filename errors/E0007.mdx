@@ -1,0 +1,32 @@
+---
+title: "E0007 — WeightShapeMismatch"
+description: "The decoded weight array has a different number of values than the layer's declared dimensions."
+---
+
+<Warning>E0007: weight shape mismatch</Warning>
+
+## What happened
+
+The artifact declares a Dense layer with `in_features × out_features` weights, but the decoded base64 array has a different number of `f32` values.
+
+## Why
+
+The artifact is corrupt. The base64-decoded bytes decode successfully, but their length is inconsistent with the declared layer dimensions. Likely cause: truncated or modified artifact file.
+
+## How to fix
+
+1. **Recompile** from scratch: `thx.compile(model, "model.thx")`.
+2. Verify artifact integrity: `thrindex doctor --check model.thx`. A CRC32 mismatch will accompany this error.
+
+## Example
+
+```
+E0007: weight shape mismatch in layer 0: declared 358400 f32 values but decoded 1433596 bytes (358399 f32 values).
+Why: the artifact's weight data is corrupt.
+Fix: recompile the model from scratch.
+Docs: https://docs.thrindex.com/errors/E0007
+```
+
+## Notes
+
+Each `f32` value is 4 bytes. If the decoded byte count is not divisible by 4, the error reports the byte count and the floor of `bytes / 4`.

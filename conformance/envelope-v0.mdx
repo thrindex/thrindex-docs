@@ -1,0 +1,93 @@
+---
+title: "Conformance Envelope V0"
+description: "The ratified CONFORMANCE_ENVELOPE_V0 constants, their derivation, scope, and reopening conditions."
+---
+
+## The constants
+
+```python
+CONFORMANCE_ENVELOPE_V0 = {
+    "status": "Final",        # ratified 2026-07-10
+    "version": "v0",
+    "T_mean_threshold":   0.020,
+    "T_max_threshold":    0.130,
+    "pred_agreement_min": 0.900,
+    "min_test_samples":   100,
+}
+```
+
+A backend must satisfy **all three simultaneously** to earn the THRINDEX Certified [v0] badge:
+
+| Metric | Threshold | Meaning |
+|---|---|---|
+| `T_mean` | ≤ 0.020 | Mean spike-count rate error ≤ 2% |
+| `T_max` (p99) | ≤ 0.130 | Worst-neuron error ≤ 13% |
+| `P_pred` | ≥ 0.900 | ≥ 90% of classification decisions agree |
+
+## Fixture set
+
+The ratification fixture set is frozen at CRC32 `e2ebd845` (120 SHD test samples, stratified 6 per class × 20 classes). It lives at `conformance/fixtures/shd_ratify_v1/frozen/` in the monorepo.
+
+| Property | Value |
+|---|---|
+| Fixture fingerprint | CRC32 `e2ebd845`, 120 files |
+| Selection | Stratified: 6 samples × 20 SHD classes |
+| Source | SHD test split (CC BY 4.0) |
+| Generation script | `scripts/freeze_shd_fixtures.py --seed 0` |
+
+## Quantization model
+
+The envelope was calibrated against per-channel symmetric int8 — the hardware-class quantization that real neuromorphic digital chips implement:
+
+- Scale per output channel: `scale_n = max_abs(row_n) / 127`
+- Rounding: round-half-to-even (banker's rounding, matches `thrindex-numerics`)
+- Clamp: \[-127, 127\]; dequantize: `q as f32 × scale_n`
+- Biases: left in f32
+
+## Ratification evidence
+
+Measured on the frozen 120-sample fixture set. Reference model: `templates/keyword-spotting/model.thx` (Dense 700→512→20, τ\_mem=20ms, 64.66% SHD test accuracy).
+
+**INT8 per-channel — should PASS (this is the hardware model the envelope targets):**
+
+| Metric | Observed | V0 threshold | Headroom |
+|---|---|---|---|
+| `T_mean` | 5.28×10⁻³ | ≤ 0.020 | **3.8×** |
+| `T_max` (p99) | 1.00×10⁻¹ | ≤ 0.130 | **30%** |
+| `P_pred` | 0.983 | ≥ 0.900 | **8.3%** |
+
+**INT4 per-channel — should FAIL (confirms thresholds are not vacuously loose):**
+
+| Metric | Observed | V0 threshold | int4/int8 ratio | Verdict |
+|---|---|---|---|---|
+| `T_mean` | 8.38×10⁻² | ≤ 0.020 | 15.9× | **FAILS** (4.2× above) |
+| `T_max` (p99) | 9.20×10⁻¹ | ≤ 0.130 | 9.2× | **FAILS** (7.1× above) |
+| `P_pred` | 0.617 | ≥ 0.900 | — | **FAILS** (46% below) |
+
+The separation is decisive. There is no metric where int8 and int4 are ambiguous.
+
+## Threshold derivation
+
+**T\_mean = 0.020** — the provisional value was confirmed by data. INT8 sits at 26% of the limit (3.8× headroom); INT4 at 419% (4.2× above). The 15.9× int8/int4 gap means the threshold is well-placed: tight enough to catch INT4 decisively, loose enough to accommodate INT8 with margin.
+
+**T\_max = 0.130** — the provisional value (0.100) equaled the observed INT8 `agg_max` exactly (zero margin). One extreme sample had a neuron differing by 10 spikes over 100 timesteps (rate error = 0.10). Adding 30% headroom gives 0.130. The auto-derived 40%-into-gap value (0.428) was rejected as too loose — certifying a backend with worst-neuron divergence of 43% has no meaningful inference interpretation. 0.130 passes INT8 with margin and fails INT4 (0.920) by 7.1×.
+
+**P\_min = 0.900** — the provisional value (0.990) was unreachable: INT8's observed overall agreement was 0.983, with boundary-case agreement 0.9375 (15/16 near-tie samples). 0.900 seats below both with 8.3% and 4.2% headroom respectively. INT4 at 0.617 fails by 32%. Semantic interpretation: the backend must agree with the float reference on ≥90% of test inputs.
+
+## V0 scope
+
+**This envelope was ratified against one reference model** (SHD keyword spotting, Dense 700→512→20, 64.66% accuracy, 120 frozen test samples). It brackets per-channel int8 divergence on that specific architecture and weight distribution. It is not yet a universal constant.
+
+A backend certified under V0 carries the badge **THRINDEX Certified [v0]**.
+
+## Reopening triggers
+
+Any one of the following mandates a V1 measurement:
+
+1. A structurally different model enters the conformance suite (recurrent layers, different T, Conv2d-heavy, or substantially different weight distribution)
+2. A real silicon backend is added whose quantization characteristics differ from per-channel int8
+3. A latency-code or time-to-first-spike model enters the suite
+
+## Re-certification
+
+Tightening any threshold is a breaking change: V0-certified backends must be re-certified under V1. Loosening requires the same approval path. The harness supports `--envelope v0` indefinitely for retesting. The V0 badge is retained in published history but marked superseded when V1 ships.

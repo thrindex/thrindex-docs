@@ -1,0 +1,31 @@
+---
+title: "E0008 — JsonParseError"
+description: "The artifact file is not valid JSON."
+---
+
+<Warning>E0008: artifact JSON parse error</Warning>
+
+## What happened
+
+The `.thx` file could not be parsed as JSON. It is either not a THRINDEX artifact, or it was corrupted.
+
+## Why
+
+- The file is not a `.thx` artifact (e.g. you passed a `.pt` PyTorch checkpoint or a text file)
+- The file was truncated during transfer
+- A text editor or transfer tool modified the encoding
+
+## How to fix
+
+1. Confirm you are passing a `.thx` file, not a `.pt`, `.pkl`, or `.json` file from a different tool.
+2. If the file should be a valid artifact, recompile: `thx.compile(model, "model.thx")`.
+3. If the artifact was transferred, re-transfer in binary mode (not text mode).
+
+## Example
+
+```
+E0008: artifact JSON parse error: expected value at line 1 column 1
+Why: the file is not valid thrindex artifact JSON.
+Fix: verify the file was produced by `thx.compile()` and was not corrupted in transfer.
+Docs: https://docs.thrindex.com/errors/E0008
+```

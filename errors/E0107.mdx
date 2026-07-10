@@ -1,0 +1,41 @@
+---
+title: "E0107 — InvalidResetMode"
+description: "The LIF reset mode is not 'subtract' or 'zero'."
+---
+
+<Warning>E0107: invalid LIF reset mode</Warning>
+
+## What happened
+
+A LIF layer in the model has a `reset` value that is not one of the two valid modes: `"subtract"` or `"zero"`.
+
+## Why
+
+The canonical vocabulary (Playbook §28) defines exactly two reset modes:
+- `"subtract"` — threshold is subtracted from the membrane potential after a spike
+- `"zero"` — membrane potential is reset to zero unconditionally after a spike
+
+Any other string is rejected.
+
+## How to fix
+
+Change the `reset` parameter to one of the valid values:
+
+```python
+# Good
+snn.LIF(tau_mem=20.0, threshold=0.3, reset="subtract")
+snn.LIF(tau_mem=20.0, threshold=0.3, reset="zero")
+
+# Bad (will produce E0107)
+snn.LIF(tau_mem=20.0, threshold=0.3, reset="hard")
+snn.LIF(tau_mem=20.0, threshold=0.3, reset="soft_reset")
+```
+
+## Example
+
+```
+E0107: invalid LIF reset mode "hard_reset" in layer 1
+Why: reset must be "subtract" or "zero" (Playbook §28 canonical vocab).
+Fix: change reset to "subtract" or "zero" when constructing the LIF layer.
+Docs: https://docs.thrindex.com/errors/E0107
+```

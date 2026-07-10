@@ -1,0 +1,155 @@
+---
+title: "thrindex.snn"
+description: "Layer constructors and module composition for building spiking neural networks."
+---
+
+## Import
+
+```python
+import thrindex.snn as snn
+```
+
+## snn.Sequential
+
+A sequential container. Layers are applied in the order they are defined. The input propagates through each layer across all T timesteps.
+
+```python
+model = snn.Sequential(*layers)
+```
+
+**Parameters**
+
+| Name | Type | Description |
+|---|---|---|
+| `*layers` | `nn.Module` | Ordered layers. Any THRINDEX layer or standard `torch.nn` module. |
+
+**Notes**
+
+- `Sequential` is compatible with `torch.nn.Sequential` for all standard PyTorch operations: `.parameters()`, `.state_dict()`, `.to(device)`.
+- The first layer in a `Sequential` determines the model's input dimension, which is stored in the `.thx` artifact.
+
+## snn.Dense
+
+A linear (fully-connected) layer. Equivalent to `torch.nn.Linear` but with optional per-connection integer delay support.
+
+```python
+layer = snn.Dense(
+    in_features: int,
+    out_features: int,
+    bias: bool = True,
+    delays: bool = False,
+    max_delay: int = 15,
+)
+```
+
+**Parameters**
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `in_features` | `int` | — | Input feature dimension |
+| `out_features` | `int` | — | Output feature dimension |
+| `bias` | `bool` | `True` | Whether to include a bias vector |
+| `delays` | `bool` | `False` | Enable per-connection integer delays |
+| `max_delay` | `int` | `15` | Maximum delay in timesteps (stored in artifact as `delay_max`) |
+
+**Weight initialization**
+
+Weights are initialized with Kaiming uniform initialization (fan-in mode), matching `torch.nn.Linear`. Delays, if enabled, are initialized to 1 (one-step propagation, the default).
+
+## snn.LIF
+
+A layer of leaky integrate-and-fire neurons.
+
+```python
+layer = snn.LIF(
+    tau_mem: float,
+    threshold: float = 1.0,
+    tau_syn: float | None = None,
+    reset: str = "subtract",
+    dt: float = 1.0,
+)
+```
+
+**Parameters**
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `tau_mem` | `float` | — | Membrane time constant in milliseconds |
+| `threshold` | `float` | `1.0` | Firing threshold |
+| `tau_syn` | `float \| None` | `None` | Synaptic filter time constant in ms. If `None`, no synaptic filter is applied. |
+| `reset` | `str` | `"subtract"` | Reset mode: `"subtract"` (default) or `"zero"` |
+| `dt` | `float` | `1.0` | Simulation timestep in ms. Set once on the model; do not vary across layers. |
+
+**Computed constants (stored in artifact)**
+
+| Name | Formula | Description |
+|---|---|---|
+| `alpha` | `exp(-dt / tau_mem)` | Membrane leak factor |
+| `beta` | `exp(-dt / tau_syn)` | Synaptic filter factor (only if `tau_syn` is set) |
+
+**Input / Output shapes**
+
+- Input: `[batch, T, in_features]`
+- Output: `[batch, T, n_neurons]` — binary spike raster (values are exactly 0.0 or 1.0 in the forward pass; gradients are surrogate-smoothed in the backward pass)
+
+**Notes**
+
+- `n_neurons` is determined by the `out_features` of the preceding `Dense` layer. There is no `n_neurons` argument — the LIF layer infers its size from the input shape on the first forward call.
+- The membrane state is initialized to zero at the start of each sample. It is not persistent across samples in a batch.
+
+## snn.Conv2d
+
+A 2D convolutional layer for spatial spike inputs (event-camera data, 2D feature maps).
+
+```python
+layer = snn.Conv2d(
+    in_channels: int,
+    out_channels: int,
+    kernel_size: int | tuple[int, int],
+    stride: int = 1,
+    padding: int = 0,
+    bias: bool = True,
+)
+```
+
+**Parameters**
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `in_channels` | `int` | — | Number of input channels |
+| `out_channels` | `int` | — | Number of output channels |
+| `kernel_size` | `int \| tuple` | — | Kernel height and width |
+| `stride` | `int` | `1` | Convolution stride |
+| `padding` | `int` | `0` | Zero-padding on all sides |
+| `bias` | `bool` | `True` | Whether to include per-channel bias |
+
+**Input / Output shapes**
+
+- Input: `[batch, T, C_in, H, W]`
+- Output: `[batch, T, C_out, H_out, W_out]`
+
+## snn.Flatten
+
+Flattens spatial dimensions. Used between convolutional and dense layers.
+
+```python
+layer = snn.Flatten()
+```
+
+- Input: `[batch, T, C, H, W]`
+- Output: `[batch, T, C × H × W]`
+
+## Forward pass
+
+All THRINDEX layers process the time dimension in the same way: they iterate over `T` timesteps and apply the layer computation at each step, maintaining any stateful quantities (membrane potential, synaptic current) across timesteps.
+
+The forward pass of a `Sequential` is equivalent to:
+
+```python
+x = input_spikes  # [batch, T, in_features]
+for layer in self.layers:
+    x = layer(x)
+# x is now [batch, T, out_features]
+```
+
+Each layer applies its operation at each `t` and passes the result to the next.

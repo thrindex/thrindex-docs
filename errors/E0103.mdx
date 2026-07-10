@@ -1,0 +1,29 @@
+---
+title: "E0103 — DelayExceedsTargetMax"
+description: "A synaptic delay exceeds the target hardware's maximum, and the fallback is reject."
+---
+
+<Warning>E0103: synaptic delay exceeds target maximum</Warning>
+
+## What happened
+
+A synaptic delay in the model is larger than `native_delay_max_steps` for the compilation target, and the target's `delay_fallback` is set to `"reject"`.
+
+## Why
+
+Hardware backends have a maximum delay register size. Loihi 2, for example, supports delays up to 63 timesteps natively. A model requiring delay=100 cannot be mapped to this hardware without emulation — and if emulation is disabled (`delay_fallback="reject"`), compilation fails.
+
+## How to fix
+
+1. **Reduce the delay** to ≤ `max_steps`.
+2. **Switch to a target that supports longer delays or emulation**: the `sim` target emulates delays without limit. Use it for development, then reduce delays before targeting hardware.
+3. **Use a target with `delay_fallback="emulate"`**: this inserts buffer stages in the network graph, allowing longer delays at the cost of increased model size and memory.
+
+## Example
+
+```
+E0103: synaptic delay exceeds target maximum in layer 0 connection 42
+Why: delay_steps=80 > native_delay_max_steps=63 for this target, and delay_fallback is "reject".
+Fix: reduce the delay to ≤ 63 steps, or use a target that supports longer delays or emulation.
+Docs: https://docs.thrindex.com/errors/E0103
+```

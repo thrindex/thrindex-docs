@@ -1,0 +1,33 @@
+---
+title: "E0203 — OutputShapeMismatch (backend)"
+description: "The hardware backend returned an output raster with different dimensions than the reference."
+---
+
+<Warning>E0203: backend output shape mismatch</Warning>
+
+## What happened
+
+A hardware backend ran inference and returned an output raster, but the raster has a different number of timesteps (`got_t ≠ t`) or output neurons (`got_n ≠ n`) than the model's declared output shape.
+
+## Why
+
+This is a backend implementation bug. The backend must run exactly `T` timesteps and return exactly `N_out` neurons per the artifact's declared output layer.
+
+## How to fix
+
+1. If you are integrating a hardware backend: verify that your backend's `run_batch` implementation returns a tensor of shape `[batch, T, N_out]` where `T` and `N_out` come from the artifact.
+2. Check for off-by-one errors in timestep unrolling.
+3. If this occurs with a production THRINDEX release, file a bug with the artifact, target name, and the exact error message.
+
+## Example
+
+```
+E0203: backend output shape mismatch — expected [100, 20], got [99, 20]
+Why: the backend returned fewer/more timesteps or neurons than the reference simulation
+Fix: verify the backend correctly unrolls T timesteps and outputs all N_out neurons
+Docs: https://docs.thrindex.com/errors/E0203
+```
+
+## Related
+
+- [E0206](/errors/E0206) — the same check performed per-sample in the conformance harness

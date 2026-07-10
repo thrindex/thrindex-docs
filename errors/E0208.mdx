@@ -1,0 +1,36 @@
+---
+title: "E0208 — ReferenceError"
+description: "The reference simulator returned an error during a conformance run. This indicates a harness or artifact bug."
+---
+
+<Warning>E0208: reference simulator error on sample N</Warning>
+
+## What happened
+
+The reference `SimBackend` returned an error when running sample `sample_idx` during a conformance harness run. Unlike [E0207](/errors/E0207) (which is a backend-under-test error), this error comes from the reference simulator itself.
+
+## Why
+
+The reference simulator should never fail on a valid artifact and a valid input. If it does, one of the following is true:
+
+1. The artifact is invalid (corrupted or malformed — check with `thrindex doctor --check`)
+2. The fixture file is malformed (invalid JSON, wrong shape)
+3. There is a bug in the reference simulator (please file a bug report)
+
+This is always a harness or artifact problem, never a property of the backend under test.
+
+## How to fix
+
+1. **Verify the artifact**: `thrindex doctor --check <artifact.thx>`. If it reports any errors, recompile.
+2. **Verify the fixture file**: inspect the sample JSON file at the reported sample index. Confirm it is valid JSON with the correct `spikes` field shape.
+3. **Run the simulator directly** on the failing sample: `thrindex run <artifact.thx> --stdin < fixture_N.json`. If it fails, this confirms an artifact or fixture issue.
+4. If the artifact and fixture are valid and this error occurs, please file a bug at https://github.com/thrindex/thrindex/issues.
+
+## Example
+
+```
+E0208: reference simulator error on sample 12: E0010: input dimension mismatch: model expects 700 input neurons, got 500
+Why: the reference SimBackend returned an error — this indicates a harness or artifact bug, not a backend issue
+Fix: verify the artifact is valid; file a bug if the artifact was produced by `thrindex compile`
+Docs: https://docs.thrindex.com/errors/E0208
+```

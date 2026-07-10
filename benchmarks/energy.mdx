@@ -1,0 +1,55 @@
+---
+title: "Energy Model"
+description: "How THRINDEX estimates energy, the formula, the default coefficient, and worked examples."
+---
+
+See also: [Learn: The Energy Model](/learn/energy-model) for background on neuromorphic energy accounting.
+
+## Formula
+
+```
+energy_pJ = Σ_layer (pre_spikes_in_layer × fan_out_of_layer) × coefficient_pJ
+```
+
+| Symbol | Meaning |
+|---|---|
+| `pre_spikes_in_layer` | Spike events from the pre-synaptic population across all timesteps |
+| `fan_out_of_layer` | Post-synaptic connections per neuron (= `out_features` for Dense, `out_channels × kH × kW` for Conv2d) |
+| `coefficient_pJ` | Energy per synaptic operation (default: **0.5 pJ/syn-op**) |
+
+The product `pre_spikes × fan_out` is the number of **synaptic operations** (multiply-accumulates triggered by spikes). This is the standard neuromorphic energy metric.
+
+## Worked example
+
+`Dense(700→512) → LIF → Dense(512→20) → LIF`, 100 timesteps, 10% spike rate:
+
+```
+Layer 1 (Dense 700→512):
+  pre_spikes  = 700 × 100 × 0.10 = 7,000
+  fan_out     = 512
+  ops         = 7,000 × 512 = 3,584,000
+
+Layer 3 (Dense 512→20):
+  pre_spikes  = 512 × 100 × 0.10 = 5,120
+  fan_out     = 20
+  ops         = 5,120 × 20 = 102,400
+
+Total ops   = 3,686,400
+Energy      = 3,686,400 × 0.5 pJ/syn-op = 1.84 µJ
+```
+
+LIF layers have no synaptic weights and contribute no ops.
+
+## The coefficient
+
+**0.5 pJ/syn-op** is the default. It is consistent with published neuromorphic silicon figures from 7nm digital processes. It is not calibrated to any specific device or operating point.
+
+To override: `thrindex run model.thx --energy-coeff 3.0` (units: pJ/syn-op).
+
+## What the estimate captures and does not capture
+
+**Captures:** the spike-driven efficiency advantage. Energy scales with spike count, not model parameter count. A feedforward ANN with the same parameter count processes all multiplications every timestep — roughly `1/spike_rate` more energy for the same architecture at 10% activity.
+
+**Does not capture:** memory access energy, on-chip routing energy, chip idle power, host interface overhead, or system-level power.
+
+**Not a silicon measurement.** For hardware-measured power, see the device datasheet for your target chip.

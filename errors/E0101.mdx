@@ -1,0 +1,35 @@
+---
+title: "E0101 — TauMemTooSmall"
+description: "The LIF membrane time constant tau_mem is less than or equal to the effective dt."
+---
+
+<Warning>E0101: LIF tau_mem too small for effective dt</Warning>
+
+## What happened
+
+The compiler's validate pass found a LIF layer where `tau_mem ≤ dt`. This makes the leak factor `alpha = exp(-dt / tau_mem)` approach zero — the neuron would forget its entire state within one timestep.
+
+## Why
+
+The membrane time constant (`tau_mem`) controls how long a neuron remembers its history. If `tau_mem ≤ dt`, the neuron has no memory — it resets completely every step, which is equivalent to a threshold gate, not an integrator.
+
+This guard implements ADR-0005: the discretization must preserve the membrane dynamics in a physically meaningful way.
+
+## How to fix
+
+1. **Increase `tau_mem`**: set `tau_mem` to a value clearly greater than `dt`. For `dt=1.0ms`, a `tau_mem` of 5ms or more is reasonable.
+2. **Reduce `dt`**: if your application requires very fast membrane dynamics, reduce the simulation timestep. `dt=0.1ms` with `tau_mem=0.5ms` is valid.
+3. If you are targeting hardware with a larger native `dt` (e.g. 2ms), the retiming pass will also raise E0101 if the effective `tau_mem` is too small for the target's dt.
+
+## Example
+
+```
+E0101: LIF tau_mem too small for effective dt in layer 1
+Why: tau_mem=0.5000 ms is ≤ dt=1.0000 ms; the membrane would lose all history within one step.
+Fix: set tau_mem > 1.0000 ms when constructing the LIF layer.
+Docs: https://docs.thrindex.com/errors/E0101
+```
+
+## Physical interpretation
+
+`alpha = exp(-dt/tau_mem)`. For `tau_mem = dt`: `alpha = exp(-1) ≈ 0.368`. For `tau_mem = dt/2`: `alpha ≈ 0.135`. The guard fires when `tau_mem ≤ dt`, ensuring at least `alpha > 1/e ≈ 0.368`.

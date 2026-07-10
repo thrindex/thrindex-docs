@@ -1,0 +1,57 @@
+---
+title: "Time in Spiking Neural Networks"
+description: "Discrete timesteps, the role of dt, spike rasters, and why the time representation matters for hardware."
+---
+
+## Time is a first-class dimension
+
+In a conventional neural network, a single forward pass processes one sample. In an SNN, a single forward pass processes one sample **over T timesteps** — time is part of the input shape, not an implementation detail.
+
+A sample in THRINDEX has shape `[T, n_features]`. The output of a model is a spike raster of shape `[T, n_output_neurons]`. Both dimensions are explicit, fixed at compile time, and stored in the artifact.
+
+## The timestep `dt`
+
+`dt` (delta-t) is the duration of one simulation timestep in milliseconds. It controls how a biological time constant (`tau_mem = 20 ms`) maps to a discrete recurrence factor:
+
+$$
+\alpha = e^{-\Delta t / \tau_{\text{mem}}}
+$$
+
+For `dt = 1 ms`, `tau_mem = 20 ms` → `α ≈ 0.951`. For `dt = 2 ms` → `α ≈ 0.905`. The same biological time constant produces different discrete dynamics at different `dt`.
+
+`dt` is declared in the THRINDEX model and stored in the `.thx` artifact. It is not a runtime parameter. When a model is compiled for a hardware backend with a different native `dt`, the compiler recomputes `alpha` and issues a retiming advisory.
+
+## The spike raster
+
+A spike raster is a binary matrix `S[T, N]` where `S[t, n] = 1` if neuron `n` fired at timestep `t`, and 0 otherwise.
+
+The raster is the fundamental output of every THRINDEX model. When you run `thrindex run model.thx`, the printed transcript contains the raster statistics: spike count per neuron, total synaptic operations, prediction (argmax of spike counts).
+
+## Rate coding vs. temporal coding, revisited
+
+**Rate coding** reads the raster by column: sum over T for each neuron. The neuron with the most spikes wins the prediction. The timing of individual spikes does not matter.
+
+```
+T=100, N=5 raster (each row is a timestep, each column a neuron):
+t=0:  [0, 0, 1, 0, 0]
+t=1:  [0, 1, 1, 0, 0]
+t=2:  [0, 0, 1, 0, 0]
+...
+Counts: [3, 12, 47, 0, 8]  → prediction: neuron 2
+```
+
+**Temporal coding** reads the raster by row: the first timestep at which each neuron fires matters. Neuron 2 firing at `t=2` and neuron 5 firing at `t=40` encode different values.
+
+THRINDEX currently targets rate coding. `T = 100` timesteps at `dt = 1ms` gives a 100ms integration window — sufficient for speech and slow temporal patterns. Models are trained with cross-entropy over spike counts, not over spike times.
+
+## T and the accuracy floor
+
+Longer T means more integration time and generally higher accuracy — each neuron can accumulate more evidence. But T is a direct multiplier on compute and memory: a model with T=200 does exactly twice the synaptic operations as T=100 for the same input.
+
+The practical design rule: use the shortest T that achieves your accuracy target. The keyword-spotting tutorial uses T=100 (100 ms at dt=1 ms) and achieves 64.66% on SHD. Longer T improves this but at linear cost.
+
+## Synaptic delays
+
+Delays are an additional temporal dimension: a synapse can be configured to transmit its spike with a lag of `D` timesteps. This allows a network to represent temporal relationships in the input without increasing T.
+
+THRINDEX supports per-connection integer delays in the `.thx` artifact. On hardware backends, delays may be native (the hardware has explicit delay registers) or emulated (the compiler inserts buffer stages). The delay semantics, encoding, and negotiation policy are specified in [Concepts: Delays](/concepts/delays).

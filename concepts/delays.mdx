@@ -1,0 +1,57 @@
+---
+title: "Synaptic Delays"
+description: "Per-connection integer delays in THRINDEX: semantics, encoding in the artifact, and hardware negotiation."
+---
+
+## What delays are
+
+A synaptic delay `D` means a spike emitted by pre-synaptic neuron `n` at timestep `t` arrives at post-synaptic neuron `m` at timestep `t + D`. In a network without delays, every spike arrives at the next timestep (effective delay of 1).
+
+Delays allow a network to represent temporal structure in the input — patterns that unfold over more timesteps than the LIF membrane time constant — without increasing the total number of timesteps T.
+
+## In THRINDEX
+
+Delays are per-connection, specified as positive integers (number of timesteps). They are set on the layer's weight tensor, not on the LIF neuron:
+
+```python
+import thrindex.snn as snn
+
+layer = snn.Dense(512, 512, delays=True, max_delay=15)
+```
+
+This creates a Dense layer where each connection `(i, j)` has an associated integer delay `D[i, j] ∈ {1, ..., 15}`. The delays are learnable parameters — they can be optimized during training alongside the weights.
+
+<Note>
+Delay learning requires a dedicated delay-learning optimizer. Standard Adam updates continuous weights; delays are integers and require a straight-through estimator or a discrete relaxation. The `thrindex.train.DelayOptimizer` wrapper handles this. See [API: thrindex.train](/api/thrindex-train).
+</Note>
+
+## Artifact encoding
+
+In the `.thx` artifact, delays are stored as a `uint8` tensor alongside the weight tensor. Each entry is the delay in timesteps. A `delay_max` field in the layer descriptor specifies the maximum delay declared at compile time.
+
+The artifact format does not allow delay values that exceed `delay_max`. If a network's learned delays exceed the declared maximum, the compiler rejects with `[E0108] delay value exceeds declared maximum`.
+
+## Hardware negotiation
+
+Different backends have different delay capabilities:
+
+| Capability | Semantics |
+|---|---|
+| `native_delay_max_steps` | Maximum delay the hardware can represent natively |
+| `delay_fallback: Native` | Delays up to `native_delay_max_steps` are implemented in hardware |
+| `delay_fallback: Emulate` | Delays beyond hardware max are emulated with explicit buffer stages |
+| `delay_fallback: Reject` | Any delay exceeding hardware max causes compilation to fail |
+
+The compiler reads the target's capability descriptor and applies the appropriate fallback. Buffer-stage emulation increases model size and memory usage; the compiler reports the overhead as an advisory.
+
+## Semantics: off-by-one
+
+A common confusion: what does delay=1 mean?
+
+In THRINDEX, delay=1 is the implicit default — a spike at time `t` arrives at `t+1` in the next layer (the standard feedforward step). Delay=0 is not supported (recurrent instant connections are a separate mechanism). Delay=2 means a one-timestep additional lag beyond the implicit propagation.
+
+When delays are not specified, all connections have delay=1 (the default feedforward timestep). When delays are specified, the minimum value in the delay tensor should be 1.
+
+## Current status
+
+Delay support is in the THRINDEX artifact format (M3) and the compiler. The behavioral simulator runs delays correctly. Hardware backend integration for delay-capable chips (Loihi 2's axon delay registers) is planned for M6.

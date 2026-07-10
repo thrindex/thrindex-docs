@@ -1,0 +1,134 @@
+---
+title: "The .thx Artifact Format"
+description: "What a THRINDEX artifact contains, how it is structured, and the versioning policy."
+---
+
+## Overview
+
+A `.thx` file is a JSON document with a CRC32 integrity seal. It is self-contained: everything needed to run inference — architecture, weights, resolved constants, target metadata — is in the file. No Python environment, no original model object.
+
+The format is human-readable in principle (it is JSON), but weights are base64-encoded little-endian f32 arrays. Use `thrindex doctor --check model.thx --verbose` to inspect the artifact in a human-readable form.
+
+## Structure
+
+```json
+{
+  "format": "m3",
+  "thrindex_version": "0.2.0",
+  "target": "sim",
+  "dt_ms": 1.0,
+  "crc32": "d3a4f82c",
+  "layers": [
+    {
+      "type": "Dense",
+      "in_features": 700,
+      "out_features": 512,
+      "weights": "<base64>",
+      "bias": "<base64>"
+    },
+    {
+      "type": "LIF",
+      "n_neurons": 512,
+      "alpha": 0.9512294245,
+      "threshold": 0.3,
+      "reset": "subtract"
+    },
+    {
+      "type": "Dense",
+      "in_features": 512,
+      "out_features": 20,
+      "weights": "<base64>",
+      "bias": "<base64>"
+    },
+    {
+      "type": "LIF",
+      "n_neurons": 20,
+      "alpha": 0.9512294245,
+      "threshold": 0.3,
+      "reset": "subtract"
+    }
+  ]
+}
+```
+
+## Fields
+
+| Field | Type | Description |
+|---|---|---|
+| `format` | string | Artifact format version (`m2`, `m3`, ...) |
+| `thrindex_version` | string | THRINDEX version that compiled this artifact |
+| `target` | string | Compile target (`sim`, `loihi2`, ...) |
+| `dt_ms` | float | Simulation timestep in milliseconds |
+| `crc32` | hex string | CRC32 of the artifact body (excluding this field) |
+| `layers` | array | Ordered list of layer descriptors |
+
+## Layer types
+
+**Dense**
+
+| Field | Type | Description |
+|---|---|---|
+| `in_features` | int | Input dimension |
+| `out_features` | int | Output dimension |
+| `weights` | base64 | `[out_features, in_features]` f32 array |
+| `bias` | base64 | `[out_features]` f32 array |
+| `delays` | base64 | `[out_features, in_features]` u8 array (optional) |
+| `delay_max` | int | Maximum delay value (optional, required if `delays` present) |
+
+**LIF**
+
+| Field | Type | Description |
+|---|---|---|
+| `n_neurons` | int | Number of neurons in this layer |
+| `alpha` | float | Leak factor `exp(-dt / tau_mem)` |
+| `beta` | float | Synaptic filter `exp(-dt / tau_syn)` (optional) |
+| `threshold` | float | Spike threshold |
+| `reset` | string | `"subtract"` or `"zero"` |
+
+**Conv2d**
+
+| Field | Type | Description |
+|---|---|---|
+| `in_channels` | int | Input channels |
+| `out_channels` | int | Output channels |
+| `kernel_h` | int | Kernel height |
+| `kernel_w` | int | Kernel width |
+| `padding` | int | Symmetric padding |
+| `stride` | int | Stride |
+| `weights` | base64 | `[out_ch, in_ch, kH, kW]` f32 array |
+| `bias` | base64 | `[out_ch]` f32 array |
+
+## The CRC32 seal
+
+The CRC32 is computed over the serialized JSON body with the `crc32` field set to `"00000000"` (a placeholder). After serialization, the CRC32 is computed and the placeholder is replaced with the hex digest.
+
+Verification: `thrindex doctor --check model.thx` recomputes the CRC32 and compares. Any byte-level modification to the artifact body fails this check with `[E0004]`.
+
+## Format versioning policy
+
+- Format versions are integers with an `m` prefix: `m1`, `m2`, `m3`.
+- New fields are additive. A `m3` reader can load an `m2` artifact by filling new fields with defaults.
+- Removed fields are a breaking change and require a new major format version.
+- The current production format is **m3**.
+- `m2` artifacts are read-only supported (can be run but not produced by THRINDEX 0.2).
+
+## Inspecting an artifact
+
+```bash
+thrindex doctor --check model.thx --verbose
+```
+
+```
+artifact:   model.thx
+format:     m3  (current)
+version:    0.2.0
+target:     sim
+dt_ms:      1.0
+crc32:      OK  (d3a4f82c)
+layers:
+  [0] Dense     700 → 512   weights: 358400 bytes
+  [1] LIF       512         alpha: 0.9512  threshold: 0.3  reset: subtract
+  [2] Dense     512 → 20    weights: 40960 bytes
+  [3] LIF       20          alpha: 0.9512  threshold: 0.3  reset: subtract
+total params:  399380
+```

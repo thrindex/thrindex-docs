@@ -1,0 +1,150 @@
+---
+title: "thrindex.train"
+description: "Loss functions, schedulers, and training utilities for spiking neural networks."
+---
+
+## Import
+
+```python
+import thrindex.train as thx_train
+```
+
+## thx_train.rate_loss
+
+Cross-entropy loss over spike counts (rate coding). The canonical loss function for THRINDEX classifiers.
+
+```python
+loss = thx_train.rate_loss(
+    spikes: torch.Tensor,     # [batch, T, n_classes]
+    targets: torch.Tensor,    # [batch], long
+    reduction: str = "mean",
+) -> torch.Tensor              # scalar
+```
+
+**Parameters**
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `spikes` | `Tensor[batch, T, n]` | — | Output spike raster from the model |
+| `targets` | `Tensor[batch]` | — | Integer class labels |
+| `reduction` | `str` | `"mean"` | `"mean"`, `"sum"`, or `"none"` |
+
+**Behavior**
+
+Computes spike counts per neuron (sum over T), then applies standard cross-entropy:
+
+```
+counts[b, n] = sum_t spikes[b, t, n]
+loss = cross_entropy(counts, targets)
+```
+
+This is equivalent to treating spike counts as unnormalized logits. The model's output neurons compete to spike the most — the one that wins is the prediction.
+
+**Usage**
+
+```python
+for x, y in train_loader:
+    out = model(x)                        # [batch, T, n_classes]
+    loss = thx_train.rate_loss(out, y)
+    loss.backward()
+    optimizer.step()
+    optimizer.zero_grad()
+```
+
+## thx_train.reconstruction_loss
+
+Mean squared error between output and input spike rasters. The loss function for autoencoder training.
+
+```python
+loss = thx_train.reconstruction_loss(
+    output: torch.Tensor,     # [batch, T, n_features]
+    target: torch.Tensor,     # [batch, T, n_features]
+    reduction: str = "mean",
+) -> torch.Tensor
+```
+
+Equivalent to `torch.nn.functional.mse_loss(output, target, reduction=reduction)`, provided here for consistency.
+
+## thx_train.accuracy
+
+Computes classification accuracy from a spike raster.
+
+```python
+acc = thx_train.accuracy(
+    spikes: torch.Tensor,     # [batch, T, n_classes]
+    targets: torch.Tensor,    # [batch], long
+) -> float
+```
+
+Returns the fraction of samples where the argmax of spike counts matches the target label.
+
+**Usage**
+
+```python
+with torch.no_grad():
+    out = model(x_val)
+    acc = thx_train.accuracy(out, y_val)
+    print(f"val_acc={acc:.4f}")
+```
+
+## thx_train.SpikeRegularizer
+
+A regularization term that penalizes high or low firing rates, preventing silent or saturated networks.
+
+```python
+reg = thx_train.SpikeRegularizer(
+    target_rate: float = 0.05,
+    weight: float = 1e-3,
+)
+
+loss = rate_loss(out, y) + reg(out)
+```
+
+**Parameters**
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `target_rate` | `float` | `0.05` | Desired mean firing rate (fraction of T per neuron) |
+| `weight` | `float` | `1e-3` | Regularization coefficient |
+
+**Behavior**
+
+Penalizes the squared deviation of each neuron's mean firing rate from `target_rate`:
+
+```
+reg_loss = weight × mean((rate[b, n] - target_rate)²)
+```
+
+where `rate[b, n] = mean_t(spikes[b, t, n])`.
+
+Typical values: `target_rate=0.05` (5% activity) with `weight=1e-3`. Increase `weight` if the network develops dead neurons or saturates.
+
+## thx_train.DelayOptimizer
+
+An optimizer wrapper that handles integer delay learning via a straight-through gradient estimator.
+
+```python
+delay_opt = thx_train.DelayOptimizer(
+    model: nn.Module,
+    lr_weights: float = 1e-3,
+    lr_delays: float = 0.1,
+    delay_update_every: int = 5,
+)
+
+delay_opt.zero_grad()
+loss.backward()
+delay_opt.step()
+```
+
+**Parameters**
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `model` | `nn.Module` | — | Model with `delays=True` layers |
+| `lr_weights` | `float` | `1e-3` | Learning rate for weights (passed to Adam) |
+| `lr_delays` | `float` | `0.1` | Effective step size for delay updates |
+| `delay_update_every` | `int` | `5` | Update delays every N gradient steps |
+
+**Notes**
+
+Delays are integers. The `DelayOptimizer` maintains a continuous surrogate for each delay, updates the surrogate with the straight-through gradient from the backward pass, and rounds to the nearest integer every `delay_update_every` steps. Delays are clamped to `[1, max_delay]` after each update.

@@ -1,0 +1,90 @@
+---
+title: "Surrogate Gradients"
+description: "How backpropagation works through a non-differentiable spike function, and what THRINDEX uses."
+---
+
+## The problem
+
+The spike function is a Heaviside step:
+
+$$
+s(V) = \begin{cases} 1 & \text{if } V \geq \theta \\ 0 & \text{otherwise} \end{cases}
+$$
+
+Its derivative is zero everywhere except at `V = θ`, where it is undefined. Standard backpropagation requires computing `∂L/∂V` through this function. At zero derivative, no gradient flows and the network cannot learn.
+
+## The solution
+
+During the **backward pass only**, replace the Heaviside with a smooth surrogate function `g(V)` whose derivative approximates what a useful learning signal would look like near the threshold:
+
+$$
+\frac{\partial L}{\partial V} \approx \frac{\partial L}{\partial s} \cdot g'(V - \theta)
+$$
+
+The **forward pass** is unchanged — spikes are still exactly 0 or 1. Only the gradient is approximated.
+
+This is called the straight-through estimator in the broader machine learning literature. In the SNN context, it was formalized by Neftci et al. (2019) and has become the standard training method for deep SNNs.
+
+## Fast sigmoid surrogate
+
+THRINDEX uses the fast sigmoid surrogate by default:
+
+$$
+g(x) = \frac{1}{(1 + k|x|)^2}
+$$
+
+$$
+g'(x) = \frac{-2k \cdot \text{sign}(x)}{(1 + k|x|)^3}
+$$
+
+where `x = V - θ` (potential relative to threshold) and `k` controls the sharpness. A larger `k` makes the surrogate a tighter approximation of the true step function — useful later in training; a smaller `k` provides a wider gradient signal — useful early.
+
+The surrogate is applied automatically by THRINDEX's autograd layer. It is not a hyperparameter you configure in `snn.LIF`.
+
+## Why not a simple sigmoid?
+
+A logistic sigmoid `σ(x) = 1 / (1 + e^{-x})` is smooth everywhere, but its derivative peaks at `x = 0` with value `0.25` and decays slowly. For a typical LIF neuron with threshold `θ = 1.0`, the gradient from a logistic surrogate is nearly constant across a wide range of potentials — it provides a gradient signal even far from threshold, which introduces noise.
+
+The fast sigmoid concentrates the gradient near the threshold and decays sharply away from it, which empirically produces faster convergence and better-calibrated networks.
+
+## Implications for training
+
+Because the gradient is only an approximation, SNN training is sensitive to a few things that ANN training is not:
+
+**Learning rate.** SNNs typically need a lower learning rate than equivalent ANNs. The surrogate gradient noise accumulates across timesteps and layers. THRINDEX tutorials use `lr = 1e-3` as a starting point; tune downward if loss oscillates, upward if learning is slow.
+
+**Threshold.** A threshold that is too high means most neurons never reach it, gradients are always zero, and the network is stuck. A threshold that is too low means neurons fire constantly, information is lost, and gradients are saturated. `threshold = 0.3` works well for rate-coded inputs in [0, 1]; adjust proportionally to your input scale.
+
+**Gradient clipping.** Because spike counts are bounded (0 to T), the loss surface can have sharp gradients in the weight space. Clipping gradient norms to 5.0 (`clip_grad_norm_(..., 5.0)`) prevents occasional large updates from destabilizing training.
+
+## In practice
+
+```python
+import torch
+import thrindex.snn as snn
+from thrindex.train import rate_loss
+
+model = snn.Sequential(
+    snn.Dense(700, 512),
+    snn.LIF(tau_mem=20.0, threshold=0.3),
+    snn.Dense(512, 20),
+    snn.LIF(tau_mem=20.0, threshold=0.3),
+)
+
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+
+for x, y in dataloader:
+    spikes = model(x)                                  # forward: discrete spikes
+    loss = rate_loss(spikes, y)                        # loss on spike counts
+    loss.backward()                                    # backward: surrogate gradient
+    torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
+    optimizer.step()
+    optimizer.zero_grad()
+```
+
+The surrogate gradient is applied inside `loss.backward()`. Everything else is standard PyTorch.
+
+## Further reading
+
+- Neftci, E. O., Mostafa, H., & Zenke, F. (2019). [Surrogate gradient learning in spiking neural networks](https://ieeexplore.ieee.org/document/8891809). *IEEE Signal Processing Magazine*.
+- Zenke, F., & Ganguli, S. (2018). SuperSpike: Supervised learning in multilayer spiking neural networks. *Neural Computation*.

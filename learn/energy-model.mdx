@@ -1,0 +1,84 @@
+---
+title: "The Energy Model"
+description: "How THRINDEX estimates energy consumption, what the numbers mean, and what they do not mean."
+---
+
+## The formula
+
+```
+energy_pJ = synaptic_ops × coefficient_pJ
+```
+
+Where:
+- `synaptic_ops` = total number of spike-weighted fanout operations across all timesteps
+- `coefficient_pJ` = energy per synaptic operation (default: **1 pJ**)
+
+A synaptic operation (syn-op) occurs when a pre-synaptic neuron fires and its spike propagates to a post-synaptic neuron through a weighted connection. If a neuron with 512 outgoing connections fires once, that is 512 syn-ops.
+
+## How THRINDEX counts syn-ops
+
+The simulator counts syn-ops from the spike raster. For a Dense layer with `in_features` inputs and `out_features` outputs:
+
+```
+syn-ops at timestep t = (number of input neurons that spiked at t) × out_features
+```
+
+Over all T timesteps:
+
+```
+total_syn-ops = Σ_t Σ_n spike[t, n] × out_features_of_n's_downstream_layer
+```
+
+This is reported in the `thrindex run` transcript:
+
+```
+synaptic_ops: 124800
+```
+
+## The coefficient
+
+**1 pJ per syn-op is a literature-derived estimate** for digital synchronous neuromorphic chips (Loihi-class). It is not a measurement from any specific chip or workload.
+
+Published figures from the literature:
+
+| System | syn-op energy | Source |
+|--------|--------------|--------|
+| Intel Loihi | ~23 pJ/syn-op | Davies et al. (2018) at 130 nm |
+| Intel Loihi 2 | ~1–3 pJ/syn-op | Orchard et al. (2021), 7 nm |
+| IBM TrueNorth | ~26 pJ/syn-op | Merolla et al. (2014) |
+| SpiNNaker 2 | ~5 pJ/syn-op | Mayr et al. (2019) |
+
+The THRINDEX default of 1 pJ is consistent with modern 7 nm digital neuromorphic chips. It is deliberately conservative.
+
+## Comparing to a GPU baseline
+
+A GPU running a conventional ANN with the same task uses floating-point multiply-accumulate (MAC) operations. A modern GPU does a MAC in approximately 0.1–0.5 pJ, but every neuron performs a MAC on every forward pass — there is no sparsity.
+
+An SNN on neuromorphic hardware only spends energy when a neuron spikes. If the average firing rate is 5% (5 spikes per neuron over 100 timesteps), the active computation is 5% of what a dense ANN would do.
+
+The comparison is:
+
+```
+GPU energy ≈ total_params × MAC_cost
+SNN energy ≈ total_syn-ops × syn-op_cost
+           = total_params × firing_rate × syn-op_cost
+```
+
+At 5% firing rate and 1 pJ/syn-op vs 0.3 pJ/MAC, the SNN uses ~17× less energy for the same model size. The ratio scales linearly with firing rate — a sparser network is a more efficient one.
+
+## What this number is not
+
+- It is not a silicon measurement. No chip was powered on to produce this number.
+- It is not a claim about latency, throughput, or system-level power.
+- It does not include memory access energy, chip idle power, or host interface overhead.
+- It will not match a datasheet. Datasheets measure different operating conditions.
+
+The energy model exists to make design tradeoffs visible during model development — not to make marketing claims.
+
+## Changing the coefficient
+
+```bash
+thrindex run model.thx --energy-coeff 3.0
+```
+
+Sets the coefficient to 3 pJ/syn-op. Use this when you have a measurement from your specific target chip. The formula is unchanged; only the multiplier changes.

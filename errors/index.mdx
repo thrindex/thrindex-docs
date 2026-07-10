@@ -1,0 +1,58 @@
+---
+title: "Error Reference"
+description: "Every THRINDEX error code — stable, never reused, with what happened / why / how to fix."
+---
+
+All THRINDEX errors carry a stable `E####` code, a human-readable message with four parts: **What happened**, **Why**, **How to fix** (cheapest fix first), and a **Docs link**.
+
+Error codes are organized by subsystem:
+
+| Range | Subsystem |
+|---|---|
+| E0001–E0099 | Simulator (`thrindex-sim`) |
+| E0101–E0199 | Compiler (`thrindex-compiler`) |
+| E0201–E0299 | Conformance / Backend API |
+
+Codes are never reused. If an error is retired, its number is reserved.
+
+## E00xx — Simulator
+
+| Code | Name | When |
+|---|---|---|
+| [E0001](/errors/E0001) | `ArtifactNotFound` | `.thx` file not found on disk |
+| [E0002](/errors/E0002) | `UnsupportedFormatVersion` | Artifact format version unrecognized |
+| [E0003](/errors/E0003) | `UnknownLayerType` | Layer type not known to this simulator build |
+| [E0004](/errors/E0004) | `DimensionMismatch` | Layer input/output sizes do not chain |
+| [E0005](/errors/E0005) | `InvalidLifParam` | LIF parameter out of valid range |
+| [E0006](/errors/E0006) | `Base64DecodeError` | Weight base64 decoding failed |
+| [E0007](/errors/E0007) | `WeightShapeMismatch` | Decoded weight count differs from declared shape |
+| [E0008](/errors/E0008) | `JsonParseError` | Artifact JSON is malformed |
+| [E0009](/errors/E0009) | `IntegrityCheckFailed` | CRC32 mismatch — artifact was modified after compilation |
+| [E0010](/errors/E0010) | `InputDimensionMismatch` | Input spike raster size doesn't match model's first layer |
+
+## E01xx — Compiler
+
+| Code | Name | When |
+|---|---|---|
+| [E0101](/errors/E0101) | `TauMemTooSmall` | `tau_mem ≤ dt` — neuron would lose all history |
+| [E0102](/errors/E0102) | `RetimingDelayNotInteger` | Delay cannot be retimed to target `dt` |
+| [E0103](/errors/E0103) | `DelayExceedsTargetMax` | Delay exceeds target hardware maximum |
+| [E0104](/errors/E0104) | `NoNativeDelaySupport` | Target has no delays and emulation is disabled |
+| [E0105](/errors/E0105) | `EmptyModel` | Model has no layers |
+| [E0106](/errors/E0106) | `DimensionMismatch` | Layer dimensions do not chain correctly |
+| [E0107](/errors/E0107) | `InvalidResetMode` | `reset` is not `"subtract"` or `"zero"` |
+| [E0108](/errors/E0108) | `IrJsonParseError` | Graph IR JSON is malformed |
+| [E0109](/errors/E0109) | `DelayLengthMismatch` | Delay array length ≠ `in_features × out_features` |
+
+## E02xx — Conformance / Backend
+
+| Code | Name | When |
+|---|---|---|
+| [E0201](/errors/E0201) | `ArtifactParse` | Backend could not parse or resolve the artifact |
+| [E0202](/errors/E0202) | `InputShapeMismatch` | Input tensor prepared for a different model |
+| [E0203](/errors/E0203) | `OutputShapeMismatch` | Backend output shape differs from reference |
+| [E0204](/errors/E0204) | `Execution` | Backend-specific execution failure |
+| [E0205](/errors/E0205) | `TestSetTooSmall` | Conformance run has fewer than 100 samples |
+| [E0206](/errors/E0206) | `OutputShapeMismatch` (harness) | Backend output shape differs from reference (per-sample) |
+| [E0207](/errors/E0207) | `BackendExecution` | Backend returned an error during conformance run |
+| [E0208](/errors/E0208) | `ReferenceError` | Reference simulator errored — indicates a harness bug |

@@ -1,0 +1,29 @@
+---
+title: "E0003 — UnknownLayerType"
+description: "The artifact contains a layer type this simulator does not recognize."
+---
+
+<Warning>E0003: unknown layer type</Warning>
+
+## What happened
+
+The `.thx` artifact contains a layer with a `type` field that this build of `thrindex-sim` does not support. The simulator cannot construct or run the layer.
+
+## Why
+
+The artifact was compiled with a newer version of THRINDEX that supports layer types (e.g. `Recurrent`, `SpikingConvTranspose2d`) that a previous simulator build does not know.
+
+## How to fix
+
+1. **Upgrade thrindex**: `pip install --upgrade thrindex`. This is always the right fix when running an artifact compiled by a newer version.
+2. If you cannot upgrade, recompile the model using a supported architecture with the installed version.
+
+## Example
+
+```
+E0003: unknown layer type: "Recurrent"
+Why: the artifact was compiled with a newer thrindex that supports layer types
+     this simulator does not know.
+Fix: upgrade thrindex-sim, or recompile the model with a compatible version.
+Docs: https://docs.thrindex.com/errors/E0003
+```

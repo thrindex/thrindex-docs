@@ -1,0 +1,125 @@
+---
+title: "Adding a Backend"
+description: "How to implement and register a hardware backend, run the conformance suite, and earn THRINDEX Certified."
+---
+
+## Overview
+
+A THRINDEX backend is a Rust struct that implements the `Backend` trait from `thrindex-backend-api`. Once registered, it can be used with `thx.compile(target=name)` and `thrindex run --target name`.
+
+To earn the THRINDEX Certified [v0] badge, the backend must pass the conformance harness against `CONFORMANCE_ENVELOPE_V0` on the frozen 120-sample fixture set.
+
+## Step 1: Implement the Backend trait
+
+```rust
+use thrindex_backend_api::{Backend, Capability, DelayFallback, Precision};
+use thrindex_backend_api::error::BackendError;
+
+pub struct MyChipBackend {
+    // driver handle, config, etc.
+}
+
+impl Backend for MyChipBackend {
+    fn capability(&self) -> Capability {
+        Capability {
+            name: "mychip",
+            native_dt_ms: 1.0,
+            native_delay_max_steps: 31,
+            delay_fallback: DelayFallback::Emulate,
+            precision: Precision::Fixed8,
+        }
+    }
+
+    fn run_batch(
+        &self,
+        artifact_json: &str,
+        inputs: &[Vec<Vec<f32>>],   // [sample, T, n_in]
+    ) -> Result<Vec<Vec<Vec<f32>>>, BackendError> {
+        // Load artifact, run inference on chip, return [sample, T, n_out]
+        todo!()
+    }
+}
+```
+
+**`run_batch` contract:**
+
+- Input: `inputs[s][t][n]` — sample `s`, timestep `t`, neuron `n`. Values are 0.0 or 1.0 (binary spike).
+- Output: `result[s][t][n]` — same indexing. Values must be exactly 0.0 or 1.0.
+- Output shape: `result[s]` must be `[T, N_out]` where `T` and `N_out` come from the artifact, not from the input.
+
+Violating the output shape contract produces [E0203](/errors/E0203) in the conformance harness.
+
+## Step 2: Declare the Capability
+
+The `Capability` struct tells the compiler what the backend can do:
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | `&str` | Backend identifier (used in `--target name`) |
+| `native_dt_ms` | `f64` | Native simulation timestep in ms |
+| `native_delay_max_steps` | `u16` | Max native delay. 0 = no native delay support. |
+| `delay_fallback` | `DelayFallback` | `Native`, `Emulate`, or `Reject` |
+| `precision` | `Precision` | `Float32`, `Fixed16`, `Fixed8`, `Fixed4` |
+
+## Step 3: Register the backend
+
+In Python:
+
+```python
+import thrindex as thx
+from my_backend import MyChipBackend
+
+thx.register_target(
+    name="mychip",
+    capability=MyChipBackend().capability(),
+    backend_cls=MyChipBackend,
+)
+
+# Now you can compile for this target
+thx.compile(model, "model.thx", target="mychip")
+```
+
+## Step 4: Run the conformance suite
+
+```bash
+thrindex bench --conformance --target mychip \
+    --artifact conformance/fixtures/model.thx \
+    --fixtures conformance/fixtures/shd_ratify_v1/frozen/
+```
+
+The fixture set is the frozen 120-sample SHD set, CRC32 `e2ebd845`. If your backend does not have access to the full fixture set, start with `--n-samples 10` for debugging (this produces a structural demo, not a certification run).
+
+## Step 5: Interpret the report
+
+```
+═══════════════════════════════════════════════════════════════
+ THRINDEX Conformance Report  ·  target: mychip
+ envelope:  v0  [Final]
+═══════════════════════════════════════════════════════════════
+ fixture_count:   120
+ T_mean:          0.004  ≤ 0.020  PASS
+ T_max (p99):     0.080  ≤ 0.130  PASS
+ P_pred:          0.975  ≥ 0.900  PASS
+─────────────────────────────────────────────────────────────
+ PASS — THRINDEX Certified [v0]
+═══════════════════════════════════════════════════════════════
+```
+
+Exit code 0 = PASS. Submit this report alongside your backend registration PR.
+
+## Common failure modes
+
+**T\_max too high:** a small number of samples produce neurons with large spike-count divergence. Typically a fixed-point overflow or a rounding boundary in the accumulator. Check for saturation in the multiply-accumulate path.
+
+**P\_pred too low:** the backend makes wrong classification decisions even when T\_mean is acceptable. This usually indicates a systematic bias in one weight or one neuron that dominates the argmax. Enable verbose logging on failing samples to identify the pattern.
+
+**E0206:** your `run_batch` returns the wrong output shape. Check that you are using `T` and `N_out` from the artifact, not from the input tensor shape.
+
+## Maintenance
+
+A backend must be re-certified when:
+- `CONFORMANCE_ENVELOPE_V0` is superseded by a new version
+- The backend's firmware or driver changes in a way that affects computation
+- The reference model used in the fixture set changes
+
+The V0 badge is retained in published history but marked superseded once re-certification under V1 completes.

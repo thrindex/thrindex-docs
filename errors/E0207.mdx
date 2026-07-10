@@ -1,0 +1,32 @@
+---
+title: "E0207 — BackendExecution (harness)"
+description: "The backend under test returned an error on a specific conformance sample."
+---
+
+<Warning>E0207: backend execution error on sample N</Warning>
+
+## What happened
+
+During a conformance harness run, the backend under test returned an execution error for sample `sample_idx`. The harness stops collecting results for this sample and reports the error.
+
+## Why
+
+The backend failed at runtime for this specific input. This could be:
+- A driver crash on a particular input pattern
+- A resource exhaustion that manifests only for certain input sizes
+- An unhandled edge case in the backend's execution path (e.g. an all-zero input)
+
+## How to fix
+
+1. Isolate the failing sample: run the backend directly on sample `sample_idx` from the fixture set to reproduce the error outside the harness.
+2. Check the `detail` field in the error message — it contains the backend's original error.
+3. Fix the backend to handle this input class, then re-run the conformance suite.
+
+## Example
+
+```
+E0207: backend execution error on sample 34: loihi2 driver timeout after 5000ms
+Why: the backend-under-test returned an error during the conformance run
+Fix: check the backend driver and the artifact compatibility
+Docs: https://docs.thrindex.com/errors/E0207
+```

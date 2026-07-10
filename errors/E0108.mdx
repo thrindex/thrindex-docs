@@ -1,0 +1,33 @@
+---
+title: "E0108 — IrJsonParseError"
+description: "The Graph IR JSON passed to the compiler is malformed."
+---
+
+<Warning>E0108: Graph IR JSON parse error</Warning>
+
+## What happened
+
+The compiler's capture pass received a JSON string representing the model's Graph IR (intermediate representation), but the JSON could not be parsed. It is not valid Graph IR JSON.
+
+## Why
+
+The Graph IR is produced by the Python SDK's extraction pass (`thx.compile` internally serializes the model to JSON before invoking the Rust compiler). If this error appears, the serialization or the transport between Python and Rust produced invalid JSON.
+
+This error should not occur in normal usage. It indicates:
+- A version mismatch between the Python SDK and the Rust compiler
+- A corrupted message when the Python SDK calls the native extension
+
+## How to fix
+
+1. **Upgrade thrindex**: `pip install --upgrade thrindex`. Both the Python SDK and the Rust engine ship together in the wheel.
+2. Rebuild from source if you are developing THRINDEX itself: `maturin develop --release`.
+3. If this error appears in a released version, please file a bug report with the full error message and the thrindex version (`thrindex doctor`).
+
+## Example
+
+```
+E0108: Graph IR JSON parse error: missing field `layers` at line 1 column 42
+Why: the input is not valid Graph IR JSON (produced by thx.compile's Python extraction pass).
+Fix: verify the Graph IR was produced by a current version of the thrindex Python SDK.
+Docs: https://docs.thrindex.com/errors/E0108
+```

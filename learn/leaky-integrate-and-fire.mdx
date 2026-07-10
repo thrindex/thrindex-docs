@@ -1,0 +1,117 @@
+---
+title: "The Leaky Integrate-and-Fire Neuron"
+description: "The mathematical model at the core of THRINDEX: membrane equation, threshold, reset modes, and synaptic dynamics."
+---
+
+## The membrane equation
+
+The leaky integrate-and-fire (LIF) neuron is the workhorse of computational neuroscience and the primary building block of THRINDEX models. Its dynamics are described by a first-order linear differential equation:
+
+$$
+\tau_{\text{mem}} \frac{dV}{dt} = -V(t) + I(t)
+$$
+
+Where:
+- `V(t)` is the membrane potential at time `t`
+- `τ_mem` (tau_mem) is the membrane time constant — how quickly the potential decays without input
+- `I(t)` is the input current (the weighted sum of incoming spikes)
+
+When `V(t)` reaches the threshold `θ`, the neuron emits a spike and resets.
+
+## Discrete-time form
+
+In simulation and on digital hardware, time is discretized into steps of size `Δt` (dt). The continuous equation becomes a recurrence:
+
+$$
+V[t+1] = \alpha \cdot V[t] + (1 - \alpha) \cdot I[t]
+$$
+
+$$
+\alpha = e^{-\Delta t / \tau_{\text{mem}}}
+$$
+
+The factor `α` (alpha) is the **leak factor**: how much of the current potential survives to the next timestep. For `τ_mem = 20ms` and `dt = 1ms`, `α ≈ 0.951`. For smaller `τ_mem`, the neuron forgets faster.
+
+<Note>
+THRINDEX computes `α` exactly as `exp(-dt / tau_mem)` at compile time and stores the resolved constant in the `.thx` artifact. The Python model stores `tau_mem` and `dt`; the artifact stores `alpha`. You never set `alpha` directly.
+</Note>
+
+## Parameters
+
+| Parameter | THRINDEX name | Typical range | Effect |
+|---|---|---|---|
+| Membrane time constant | `tau_mem` | 5–50 ms | Longer → slower leak → more temporal integration |
+| Synaptic time constant | `tau_syn` | 1–20 ms | Shapes the input current waveform |
+| Firing threshold | `threshold` | 0.1–2.0 | Lower → more spikes per input |
+| Reset mode | `reset` | `"subtract"` or `"zero"` | How potential resets after a spike |
+
+## Reset modes
+
+After a spike, the membrane potential is reset. THRINDEX supports two modes:
+
+**Subtract** (`reset="subtract"`, default): the threshold is subtracted from the current potential.
+
+$$
+V \leftarrow V - \theta
+$$
+
+If the potential exceeded the threshold by `0.3`, the post-spike potential is `0.3`, not zero. This preserves information about the excess charge.
+
+**Zero** (`reset="zero"`): the potential is set to zero unconditionally after a spike.
+
+$$
+V \leftarrow 0
+$$
+
+Simpler, but discards the overshoot. Use subtract mode unless you have a specific reason to zero the potential.
+
+## Synaptic dynamics
+
+A single `snn.LIF` layer in THRINDEX couples a dense layer (the synapse) with the LIF integrator. The input current is the output of the preceding linear transformation:
+
+```python
+import thrindex.snn as snn
+
+lif = snn.LIF(tau_mem=20.0, threshold=0.3, reset="subtract")
+```
+
+If `tau_syn` is specified, THRINDEX adds a first-order synaptic filter before the membrane integrator — the input current itself decays with time constant `tau_syn`:
+
+$$
+I[t+1] = \beta \cdot I[t] + W \cdot s[t]
+$$
+
+$$
+\beta = e^{-\Delta t / \tau_{\text{syn}}}
+$$
+
+Most practical models use the default (`tau_syn` not set), which means input is injected directly into the membrane. Add `tau_syn` when the application requires temporal smoothing of the input current.
+
+## What a LIF layer computes, step by step
+
+For each timestep `t = 0, 1, ..., T-1`:
+
+1. Compute input current: `I[t] = W · x[t] + b` (the preceding Dense layer)
+2. Update membrane: `V[t] = α · V[t-1] + I[t]`
+3. Check threshold: `spike[t] = 1 if V[t] ≥ threshold else 0`
+4. Apply reset: `V[t] = V[t] - threshold · spike[t]` (subtract mode)
+
+The output is the spike raster `spike[0..T-1]` — a binary matrix of shape `[T, n_neurons]`.
+
+## In code
+
+```python
+import torch
+import thrindex.snn as snn
+
+# A LIF layer with 128 neurons, 20ms membrane constant, threshold 0.3
+lif = snn.LIF(tau_mem=20.0, threshold=0.3)
+
+# Input: [batch, T, n_in] — a spike raster from the previous layer
+x = torch.zeros(4, 100, 512)
+out = lif(x)  # [batch, T, 128]
+
+# out[b, t, n] is 1 if neuron n fired at timestep t in sample b
+```
+
+The membrane state is maintained across the `T` dimension automatically. It resets to zero at the start of each new sample in the batch.

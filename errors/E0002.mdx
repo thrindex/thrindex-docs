@@ -1,0 +1,37 @@
+---
+title: "E0002 — UnsupportedFormatVersion"
+description: "The artifact's format version is not recognized by this build of thrindex."
+---
+
+<Warning>E0002: unsupported artifact format version</Warning>
+
+## What happened
+
+The `.thx` artifact declares a format version (`format` field) that this build of `thrindex-sim` does not know how to read.
+
+## Why
+
+The artifact was compiled with a newer version of THRINDEX that introduced a new artifact format. The installed `thrindex-sim` predates that format.
+
+## How to fix
+
+1. **Upgrade thrindex** (recommended): `pip install --upgrade thrindex`. Then retry.
+2. **Recompile the model** with the currently installed thrindex version: run `thx.compile(model, "model.thx")` again.
+3. If you need to run the artifact on a pinned version of thrindex, check which format that version supports with `thrindex targets`.
+
+## Example
+
+```
+E0002: unsupported artifact format version: "m4"
+Why: this build of thrindex-sim understands only "m3".
+Fix: rebuild the artifact with `thx.compile()` from thrindex >= 0.3.0.
+Docs: https://docs.thrindex.com/errors/E0002
+```
+
+## Format version history
+
+| Format | THRINDEX version | Notes |
+|---|---|---|
+| m1 | 0.1.x | Initial release |
+| m2 | 0.1.x | Added CRC32 |
+| m3 | 0.2.x | Conv2d support, delay arrays |

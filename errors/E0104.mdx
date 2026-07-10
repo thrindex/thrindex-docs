@@ -1,0 +1,29 @@
+---
+title: "E0104 — NoNativeDelaySupport"
+description: "The target has no delay support and emulation is disabled."
+---
+
+<Warning>E0104: target has no native delay support and emulation is disabled</Warning>
+
+## What happened
+
+The model uses synaptic delays (`delays=True` on a Dense layer), but the compilation target declares `native_delay_max_steps=0` and `delay_fallback="reject"`. The target cannot implement delays at all, and no fallback is configured.
+
+## Why
+
+Some hardware backends do not implement delay registers. If a model requires delays and the target cannot handle them — neither natively nor by emulation — compilation must fail.
+
+## How to fix
+
+1. **Use the `sim` target**: `thx.compile(model, "model.thx", target="sim")`. The simulator emulates delays via ring buffers without limit.
+2. **Remove delays from the model**: set `delays=False` (or do not specify `delays`) on Dense layers.
+3. **Use a different hardware target** that supports delays.
+
+## Example
+
+```
+E0104: target has no native delay support and emulation is disabled in layer 0
+Why: this target's capability descriptor declares native_delay_max_steps=0 and delay_fallback="reject".
+Fix: use the "sim" target (which emulates delays via ring buffers), or remove delays from the model.
+Docs: https://docs.thrindex.com/errors/E0104
+```

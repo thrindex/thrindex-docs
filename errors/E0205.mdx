@@ -1,0 +1,32 @@
+---
+title: "E0205 — TestSetTooSmall"
+description: "The conformance harness requires at least 100 samples. Fewer samples cannot statistically characterize the metric distribution."
+---
+
+<Warning>E0205: test set too small</Warning>
+
+## What happened
+
+You ran `thrindex bench --conformance` with fewer than 100 fixture samples. The conformance harness requires a minimum of 100 samples (as specified in `CONFORMANCE_ENVELOPE_V0.min_test_samples`).
+
+## Why
+
+The conformance metric is a distribution: `T_mean`, `T_max` (99th percentile), and `P_pred` are statistics computed over many samples. With fewer than 100 samples:
+- The 99th percentile estimate is unstable (one sample is the 99th percentile)
+- `P_pred` has a confidence interval too wide to be meaningful
+- The result would not be statistically valid evidence of conformance
+
+## How to fix
+
+1. **Provide at least 100 fixture samples**: the frozen fixture set at `conformance/fixtures/` contains 120 SHD samples — always use the full set.
+2. Do not pass `--n-samples` with a value below 100 in production conformance runs.
+3. For development/debugging, a structural demo with fewer samples is acceptable, but the harness will report `STRUCTURAL DEMO — not a certification run` rather than a PASS/FAIL verdict.
+
+## Example
+
+```
+E0205: test set too small — 50 samples provided, minimum is 100
+Why: fewer samples than the envelope's `min_test_samples` cannot statistically characterise the metric distribution
+Fix: provide ≥100 samples; see ADR-0010 Part II for the ratification measurement specification
+Docs: https://docs.thrindex.com/errors/E0205
+```

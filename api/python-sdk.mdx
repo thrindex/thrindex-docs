@@ -1,0 +1,143 @@
+---
+title: "Python SDK"
+description: "The top-level thrindex module: compile, run, and utility functions."
+---
+
+## Import
+
+```python
+import thrindex as thx
+```
+
+## thx.compile
+
+Compile a THRINDEX model to a `.thx` artifact.
+
+```python
+thx.compile(
+    model: nn.Module,
+    path: str | os.PathLike,
+    target: str = "sim",
+    dt: float = 1.0,
+    overwrite: bool = True,
+) -> None
+```
+
+**Parameters**
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `model` | `nn.Module` | — | A `snn.Sequential` model (or any THRINDEX-compatible module) |
+| `path` | `str \| Path` | — | Output file path. Extension must be `.thx`. |
+| `target` | `str` | `"sim"` | Compilation target. `"sim"` for behavioral simulator; hardware targets require a driver. |
+| `dt` | `float` | `1.0` | Simulation timestep in ms. Overrides any `dt` set on individual layers. |
+| `overwrite` | `bool` | `True` | If False, raise `FileExistsError` if the output path exists. |
+
+**Raises**
+
+- `[E0105]` — model has no layers
+- `[E0106]` — consecutive layer dimensions do not match
+- `[E0107]` — unknown `reset` mode string
+- `[E0101]` — `tau_mem ≤ dt`
+
+**Example**
+
+```python
+import thrindex as thx
+import thrindex.snn as snn
+
+model = snn.Sequential(
+    snn.Dense(700, 512),
+    snn.LIF(tau_mem=20.0, threshold=0.3),
+    snn.Dense(512, 20),
+    snn.LIF(tau_mem=20.0, threshold=0.3),
+)
+
+thx.compile(model, "model.thx")
+```
+
+## thx.run
+
+Run a compiled artifact and return the inference result.
+
+```python
+result = thx.run(
+    path: str | os.PathLike,
+    spikes: torch.Tensor | None = None,
+    seed: int = 0,
+) -> RunResult
+```
+
+**Parameters**
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `path` | `str \| Path` | — | Path to a `.thx` artifact |
+| `spikes` | `Tensor[T, n] \| None` | `None` | Input spike raster. If None, uses a zero raster. |
+| `seed` | `int` | `0` | RNG seed |
+
+**Returns: RunResult**
+
+```python
+@dataclass
+class RunResult:
+    prediction: int          # argmax of spike counts
+    spike_counts: list[int]  # one per output neuron
+    synaptic_ops: int        # total syn-ops
+    wall_time_ms: float      # simulator wall time
+    energy_pJ: float         # estimated energy
+```
+
+## thx.artifact_info
+
+Read metadata from a `.thx` artifact without running it.
+
+```python
+info = thx.artifact_info(path: str | os.PathLike) -> ArtifactInfo
+```
+
+**Returns: ArtifactInfo**
+
+```python
+@dataclass
+class ArtifactInfo:
+    format: str              # "m3"
+    thrindex_version: str    # "0.2.0"
+    target: str              # "sim"
+    dt_ms: float             # 1.0
+    crc32: str               # "d3a4f82c"
+    crc32_ok: bool           # True if integrity check passes
+    n_layers: int            # total layer count
+    n_params: int            # total trainable parameters
+```
+
+## thx.check
+
+Verify the integrity of a `.thx` artifact. Raises `[E0009]` if the CRC32 does not match.
+
+```python
+thx.check(path: str | os.PathLike) -> None
+```
+
+## thx.register_target
+
+Register a custom hardware backend for compilation and inference.
+
+```python
+thx.register_target(
+    name: str,
+    capability: Capability,
+    backend_cls: type[Backend],
+) -> None
+```
+
+**Notes**
+
+This is the extension point for hardware integrators. Once registered, the target name is accepted by `thx.compile(target=name)` and `thrindex run --target name`. See [conformance/adding-a-backend](/conformance/adding-a-backend) for the full integration guide.
+
+## Constants
+
+| Name | Value | Description |
+|---|---|---|
+| `thx.__version__` | `"0.2.0"` | THRINDEX version string |
+| `thx.ARTIFACT_FORMAT` | `"m3"` | Current artifact format version |

@@ -1,0 +1,132 @@
+---
+title: "Your First Model"
+description: "Build, train, evaluate, and run a spiking neural network with THRINDEX — end to end."
+---
+
+## What we are building
+
+A rate-coded classifier: 20 input features, 64 hidden LIF neurons, 5 output classes. We will generate synthetic data, train for 10 epochs, compile the model, and run it.
+
+This is intentionally minimal. The goal is to show the complete authoring loop — not to achieve a state-of-the-art result.
+
+## Setup
+
+```python
+import torch
+import thrindex as thx
+import thrindex.snn as snn
+from thrindex.train import rate_loss
+```
+
+## Define the model
+
+```python
+model = snn.Sequential(
+    snn.Dense(20, 64),
+    snn.LIF(tau_mem=20.0, threshold=0.3, reset="subtract"),
+    snn.Dense(64, 5),
+    snn.LIF(tau_mem=20.0, threshold=0.3, reset="subtract"),
+)
+```
+
+## Generate synthetic data
+
+We will use a rate-encoded dataset: each class is a sparse spike pattern over `T=50` timesteps.
+
+```python
+import torch
+
+T = 50
+n_in = 20
+n_classes = 5
+n_samples = 500
+
+torch.manual_seed(42)
+rates = torch.linspace(0.05, 0.40, n_classes)
+
+def make_batch(n, seed):
+    torch.manual_seed(seed)
+    labels = torch.randint(0, n_classes, (n,))
+    spikes = torch.zeros(n, T, n_in)
+    for i, c in enumerate(labels):
+        rate = rates[c]
+        spikes[i] = (torch.rand(T, n_in) < rate).float()
+    return spikes, labels
+
+x_train, y_train = make_batch(n_samples, seed=0)
+x_val, y_val = make_batch(100, seed=1)
+```
+
+## Train
+
+```python
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+
+for epoch in range(10):
+    model.train()
+    for i in range(0, n_samples, 32):
+        x = x_train[i:i+32]
+        y = y_train[i:i+32]
+        out = model(x)                                         # [batch, T, 5]
+        loss = rate_loss(out, y)
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
+        optimizer.step()
+        optimizer.zero_grad()
+
+    model.eval()
+    with torch.no_grad():
+        val_out = model(x_val)
+        counts = val_out.sum(dim=1)                            # [batch, 5]
+        preds = counts.argmax(dim=-1)
+        acc = (preds == y_val).float().mean().item()
+    print(f"Epoch {epoch+1:2d}  val_acc={acc:.3f}")
+```
+
+After 10 epochs, accuracy on this synthetic task should exceed 90%.
+
+## Compile
+
+```python
+thx.compile(model, "first_model.thx")
+print("Compiled to first_model.thx")
+```
+
+The compiler resolves `tau_mem` → `alpha`, validates the architecture, encodes weights as base64 little-endian f32, and writes a CRC32-sealed artifact.
+
+## Run
+
+```bash
+thrindex run first_model.thx
+```
+
+The simulator loads the artifact, runs it on a zero-input spike raster (the default), and prints the transcript. To run on a specific input, pipe a JSON spike raster:
+
+```bash
+echo '{"spikes": [[0.0, ...]]}' | thrindex run first_model.thx --stdin
+```
+
+## Verify artifact integrity
+
+```bash
+thrindex doctor --check first_model.thx
+```
+
+```
+artifact:   first_model.thx
+format:     m3
+crc32:      OK  (d3a4f82c)
+target:     sim
+layers:     Dense(20→64) LIF  Dense(64→5) LIF
+```
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Keyword spotting" href="/tutorials/keyword-spotting">
+    Train on a real neuromorphic dataset: Spiking Heidelberg Digits.
+  </Card>
+  <Card title="API: thrindex.snn" href="/api/thrindex-snn">
+    Full parameter reference for LIF, Dense, Sequential, Conv2d.
+  </Card>
+</CardGroup>

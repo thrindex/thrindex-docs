@@ -1,0 +1,34 @@
+---
+title: "E0204 — Execution (backend)"
+description: "The hardware backend reported an execution error."
+---
+
+<Warning>E0204: backend execution failed</Warning>
+
+## What happened
+
+The hardware backend's execution path returned an error. The model loaded successfully, the input shape was valid, but the actual inference call failed.
+
+## Why
+
+This is a backend-specific error. Common causes:
+- The hardware driver is not installed or not running
+- The hardware device is not connected or not powered
+- The device ran out of neuron core resources for this model
+- A driver API call timed out or returned an unexpected status code
+
+## How to fix
+
+1. **Check the driver**: ensure the hardware driver is installed and the device is connected. For Loihi 2: verify `nxsdk` is installed and `lsusb` shows the device.
+2. **Check device resources**: the model may require more neuron cores than are available. Try a smaller model.
+3. **Check the error detail**: the error message includes a backend-specific `detail` string from the driver. Use it to diagnose the hardware-level failure.
+4. **Run on sim first**: `thrindex run model.thx --target sim` to confirm the artifact is valid before debugging hardware.
+
+## Example
+
+```
+E0204: backend execution failed
+Why: loihi2 driver returned status RESOURCE_EXHAUSTED: model requires 128 cores, device has 64
+Fix: check backend driver and hardware connection
+Docs: https://docs.thrindex.com/errors/E0204
+```

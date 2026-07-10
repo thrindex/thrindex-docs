@@ -1,38 +1,13 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Mintlify Starter Kit",
+  "name": "THRINDEX",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
+    "primary": "#1FA87A",
+    "light": "#4ADE80",
     "dark": "#15803D"
   },
   "favicon": "/favicon.svg",
-  "navigation": {
-    "pages": [
-      {
-        "group": "Getting Started",
-        "pages": [
-          "index",
-          "quickstart"
-        ]
-      }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
   "logo": {
     "light": "/logo/light.svg",
     "dark": "/logo/dark.svg"
@@ -40,33 +15,173 @@
   "navbar": {
     "links": [
       {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
+        "label": "GitHub",
+        "href": "https://github.com/thrindex/thrindex"
       }
     ],
     "primary": {
       "type": "button",
-      "label": "Dashboard",
-      "href": "https://app.mintlify.com"
+      "label": "Get started",
+      "href": "/getting-started/installation"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Docs",
+        "groups": [
+          {
+            "group": "Learn",
+            "pages": [
+              "learn/spiking-neural-networks",
+              "learn/leaky-integrate-and-fire",
+              "learn/surrogate-gradients",
+              "learn/time-in-snn",
+              "learn/neuromorphic-hardware",
+              "learn/energy-model"
+            ]
+          },
+          {
+            "group": "Getting Started",
+            "pages": [
+              "getting-started/installation",
+              "getting-started/quickstart",
+              "getting-started/first-model"
+            ]
+          },
+          {
+            "group": "Tutorials",
+            "pages": [
+              "tutorials/keyword-spotting",
+              "tutorials/event-camera",
+              "tutorials/anomaly-detection"
+            ]
+          },
+          {
+            "group": "Concepts",
+            "pages": [
+              "concepts/compilation",
+              "concepts/conformance",
+              "concepts/delays",
+              "concepts/artifact-format"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Python SDK",
+            "pages": [
+              "api/thrindex-snn",
+              "api/thrindex-encoders",
+              "api/thrindex-train"
+            ]
+          },
+          {
+            "group": "CLI",
+            "pages": [
+              "api/cli"
+            ]
+          },
+          {
+            "group": "Python SDK (top-level)",
+            "pages": [
+              "api/python-sdk"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Errors",
+        "groups": [
+          {
+            "group": "Error Reference",
+            "pages": [
+              "errors/index",
+              "errors/E0001",
+              "errors/E0002",
+              "errors/E0003",
+              "errors/E0004",
+              "errors/E0005",
+              "errors/E0006",
+              "errors/E0007",
+              "errors/E0008",
+              "errors/E0009",
+              "errors/E0010",
+              "errors/E0101",
+              "errors/E0102",
+              "errors/E0103",
+              "errors/E0104",
+              "errors/E0105",
+              "errors/E0106",
+              "errors/E0107",
+              "errors/E0108",
+              "errors/E0109",
+              "errors/E0201",
+              "errors/E0202",
+              "errors/E0203",
+              "errors/E0204",
+              "errors/E0205",
+              "errors/E0206",
+              "errors/E0207",
+              "errors/E0208"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Benchmarks",
+        "groups": [
+          {
+            "group": "Results",
+            "pages": [
+              "benchmarks/mnist",
+              "benchmarks/spiking-heidelberg-digits",
+              "benchmarks/energy"
+            ]
+          },
+          {
+            "group": "Conformance",
+            "pages": [
+              "conformance/overview",
+              "conformance/envelope-v0",
+              "conformance/adding-a-backend"
+            ]
+          }
+        ]
+      }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "GitHub",
+          "href": "https://github.com/thrindex/thrindex",
+          "icon": "github"
+        }
+      ]
+    }
+  },
+  "font": {
+    "headings": {
+      "family": "IBM Plex Mono"
+    },
+    "body": {
+      "family": "IBM Plex Mono"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/thrindex"
     }
   },
   "contextual": {
     "options": [
       "copy",
       "view",
-      "chatgpt",
       "claude",
-      "perplexity",
-      "mcp",
-      "cursor",
-      "vscode"
+      "cursor"
     ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
   }
 }

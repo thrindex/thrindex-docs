@@ -1,0 +1,32 @@
+---
+title: "E0006 — Base64DecodeError"
+description: "The weight data in the artifact could not be base64-decoded."
+---
+
+<Warning>E0006: base64 decode error</Warning>
+
+## What happened
+
+The weight or bias data for a layer is stored as base64-encoded bytes in the `.thx` artifact. The base64 decoder rejected the data — it is not valid base64.
+
+## Why
+
+The artifact was corrupted after compilation. This can happen from:
+- Truncated file transfer
+- Text encoding conversion (e.g. Windows line endings inserted by a text editor)
+- Git LFS or S3 metadata corruption
+
+## How to fix
+
+1. **Recompile** the model: `thx.compile(model, "model.thx")`.
+2. If the artifact was downloaded, download it again and verify the checksum.
+3. Never open `.thx` files in a text editor — they contain binary data encoded as base64, and text editors can corrupt it.
+
+## Example
+
+```
+E0006: base64 decode error in layer 0 (weights): invalid base64 character at byte 42
+Why: the artifact's weight data is corrupt or was truncated.
+Fix: recompile the model from scratch with `thx.compile()`.
+Docs: https://docs.thrindex.com/errors/E0006
+```

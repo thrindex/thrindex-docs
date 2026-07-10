@@ -1,0 +1,37 @@
+---
+title: "E0105 — EmptyModel"
+description: "The model has no layers."
+---
+
+<Warning>E0105: model has no layers</Warning>
+
+## What happened
+
+You called `thx.compile(model, ...)` with a `Sequential` that contains no layers.
+
+## Why
+
+An empty model has no input shape, no output shape, and no parameters. It cannot be compiled, serialized, or run.
+
+## How to fix
+
+Add at least one layer to the model before compiling:
+
+```python
+model = snn.Sequential(
+    snn.Dense(700, 512),
+    snn.LIF(tau_mem=20.0, threshold=0.3),
+    snn.Dense(512, 20),
+    snn.LIF(tau_mem=20.0, threshold=0.3),
+)
+thx.compile(model, "model.thx")
+```
+
+## Example
+
+```
+E0105: model has no layers
+Why: an empty Sequential cannot be compiled or simulated.
+Fix: add at least one layer to the model before calling thx.compile().
+Docs: https://docs.thrindex.com/errors/E0105
+```

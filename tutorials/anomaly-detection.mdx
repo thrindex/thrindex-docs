@@ -1,0 +1,105 @@
+---
+title: "Anomaly Detection"
+description: "Deploy a low-power spiking autoencoder for on-device anomaly detection — a canonical neuromorphic use case."
+---
+
+## Why SNNs for anomaly detection
+
+Anomaly detection on edge devices has a hard constraint: the device runs continuously, on battery, and cannot offload data. A conventional neural network running inference continuously is often too expensive in power.
+
+An SNN has a key property: in normal conditions (no anomaly), the input signal is normal, the membrane potentials stay near baseline, and the network fires rarely. Power consumption is proportional to spike count — which is low. When an anomaly occurs, the signal deviates, potentials spike more, and the anomaly is detected precisely because the network's energy consumption increases.
+
+This is the inverse of the problem on a GPU, where computing nothing is hard and computing something costs the same regardless of the input.
+
+## Architecture: spiking autoencoder
+
+An autoencoder learns to reconstruct normal inputs. When presented with an anomalous input, reconstruction error is high — that is the anomaly signal.
+
+```
+Encoder:  Dense(N, 64) → LIF → Dense(64, 16) → LIF
+Decoder:  Dense(16, 64) → LIF → Dense(64, N) → LIF
+```
+
+The output of the decoder is a reconstructed spike raster. Anomaly score is the mean squared error between input and reconstruction.
+
+```python
+import thrindex.snn as snn
+
+encoder = snn.Sequential(
+    snn.Dense(256, 64),
+    snn.LIF(tau_mem=20.0, threshold=0.3),
+    snn.Dense(64, 16),
+    snn.LIF(tau_mem=20.0, threshold=0.3),
+)
+
+decoder = snn.Sequential(
+    snn.Dense(16, 64),
+    snn.LIF(tau_mem=20.0, threshold=0.3),
+    snn.Dense(64, 256),
+    snn.LIF(tau_mem=20.0, threshold=0.3),
+)
+```
+
+## Training
+
+Train on normal samples only. The loss is reconstruction error:
+
+```python
+import torch
+import thrindex.train as thx_train
+
+optimizer = torch.optim.Adam(
+    list(encoder.parameters()) + list(decoder.parameters()),
+    lr=1e-3
+)
+
+for x_normal in normal_loader:              # [batch, T, 256]
+    z = encoder(x_normal)                  # [batch, T, 16]
+    x_hat = decoder(z)                     # [batch, T, 256]
+    loss = thx_train.reconstruction_loss(x_hat, x_normal)
+    loss.backward()
+    torch.nn.utils.clip_grad_norm_(
+        list(encoder.parameters()) + list(decoder.parameters()), 5.0
+    )
+    optimizer.step()
+    optimizer.zero_grad()
+```
+
+## Detection
+
+At inference time, compute the anomaly score for each incoming window:
+
+```python
+with torch.no_grad():
+    z = encoder(x_window)
+    x_hat = decoder(z)
+    score = ((x_hat - x_window) ** 2).mean()
+    is_anomaly = score > threshold
+```
+
+The detection threshold is set from the normal training distribution (typically the 99th percentile of reconstruction errors on a held-out normal validation set).
+
+## Deployment pattern
+
+The autoencoder is compiled to two separate artifacts — encoder and decoder — and deployed as a pipeline:
+
+```bash
+thrindex run encoder.thx --stdin | thrindex run decoder.thx --stdin
+```
+
+Or as a fused artifact (planned for M6):
+
+```bash
+thrindex run anomaly_detector.thx --stream
+```
+
+The streaming mode processes one window at a time, maintaining persistent membrane state across windows, enabling truly continuous on-device inference.
+
+## Why this is a canonical neuromorphic use case
+
+- **Always-on, low-power**: only anomalies generate significant spike activity
+- **Event-driven**: the SNN can be clocked at sensor rate rather than a fixed rate
+- **No transmission needed**: the anomaly decision is made on-device
+- **Calibratable**: the anomaly threshold is a scalar, adjustable in production without retraining
+
+The energy expenditure in the normal state is proportional to the normal-class firing rate — typically 5–10% activity — rather than proportional to model size.

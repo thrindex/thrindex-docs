@@ -1,0 +1,79 @@
+---
+title: "Installation"
+description: "Install THRINDEX and verify the environment."
+---
+
+## Requirements
+
+- Python 3.11 or later
+- A working `pip` or `uv` installation
+- PyTorch 2.0 or later (installed automatically as a dependency)
+
+## Install
+
+```bash
+pip install thrindex
+```
+
+Or with [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv add thrindex
+```
+
+## Verify
+
+```bash
+thrindex doctor
+```
+
+Expected output:
+
+```
+Python:     3.12.4  ✓ (≥ 3.11 required)
+thrindex:   0.2.0
+torch:      2.4.0   ✓ (optional, found)
+artifact:   —       (no artifact specified)
+```
+
+If `torch` is not installed, the doctor check still passes — PyTorch is required for training but not for running pre-compiled artifacts.
+
+## Install with training dependencies
+
+If you are training models (not just running pre-compiled artifacts), install with the training extras:
+
+```bash
+pip install "thrindex[train]"
+```
+
+This adds PyTorch and any dataset utilities. If you already have PyTorch installed in your environment, plain `pip install thrindex` is sufficient.
+
+## The CLI
+
+After installation, the `thrindex` command is available on your PATH:
+
+```bash
+thrindex --help
+```
+
+```
+thrindex 0.2.0
+Usage:
+  thrindex run <model.thx> [--seed N] [--threads N]
+  thrindex bench --conformance --target sim [--artifact F] [--fixtures D]
+  thrindex doctor [--check <model.thx>] [--verbose]
+  thrindex targets
+```
+
+The CLI and the Python SDK are peer consumers of the same Rust engine. They produce identical output.
+
+## Building from source
+
+```bash
+git clone https://github.com/thrindex/thrindex
+cd thrindex
+uv sync
+uv run maturin develop --release
+```
+
+The Rust workspace builds with `cargo build --workspace`. The Python wheel is built with `maturin`. CI runs on Ubuntu and macOS.

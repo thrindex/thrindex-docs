@@ -1,0 +1,65 @@
+---
+title: "Compilation"
+description: "What thrindex.compile does, what the compiler resolves, and what decisions are locked at compile time."
+---
+
+## What compilation does
+
+`thx.compile(model, "output.thx")` performs three things:
+
+1. **Resolution.** Runtime hyperparameters (`tau_mem`, `dt`) are resolved to discrete constants (`alpha = exp(-dt / tau_mem)`). Once resolved, the constant is in the artifact; the hyperparameter is not.
+
+2. **Validation.** The compiler checks the architecture against the target's capability descriptor. It rejects models that cannot be represented: missing required parameters, unsupported layer types, weight shapes inconsistent with the declared architecture.
+
+3. **Sealing.** The artifact is written with a CRC32 integrity hash. Any post-compilation modification of the `.thx` file will cause `thrindex run` and `thrindex doctor` to report `[E0004] artifact CRC32 mismatch`.
+
+## What is resolved at compile time
+
+| Python parameter | Artifact field | Resolved as |
+|---|---|---|
+| `tau_mem` | `alpha` | `exp(-dt / tau_mem)` |
+| `tau_syn` | `beta` | `exp(-dt / tau_syn)` |
+| `threshold` | `threshold` | passed through |
+| `reset` | `reset` | `"subtract"` → 0, `"zero"` → 1 |
+| `dt` | `dt_ms` | passed through |
+
+The Python model stores `tau_mem`. The artifact stores `alpha`. You can reconstruct `tau_mem` from `alpha` and `dt_ms`, but there is no round-trip guarantee for `tau_syn` if it was not explicitly set (the default means no synaptic filter, which is distinct from `tau_syn = dt`).
+
+## Compile targets
+
+By default, `thx.compile` targets the behavioral simulator (`sim`). To compile for a specific hardware backend:
+
+```python
+thx.compile(model, "model.thx", target="loihi2")
+```
+
+The compiler loads the `loihi2` capability descriptor and applies target-specific transformations:
+
+- **Retiming**: if the target's native `dt` differs from the model's `dt`, weights and time constants are adjusted.
+- **Quantization advisory**: if the target is fixed-point, the compiler reports the expected quantization error bracket based on `CONFORMANCE_ENVELOPE_V0`.
+- **Delay negotiation**: if the model specifies delays and the target cannot represent them natively, the compiler inserts buffer stages or rejects.
+
+## Compile-time advisories
+
+The compiler prints advisories — not errors — for decisions that succeed but require attention:
+
+```
+advisory: retiming dt=1ms → dt=2ms (alpha 0.9512 → 0.9048)
+advisory: delay synapse[0] d=3 exceeds hardware max d=2; emulated with buffer stage
+```
+
+Advisories are informational. The compilation succeeds. They appear in `thrindex compile --verbose`.
+
+## What is not locked at compile time
+
+- **Input size** (T and n_features) is locked in the artifact. You cannot feed a compiled 100×700 model a 50×700 input without recompiling.
+- **Batch size** is not locked — the artifact runs on any batch.
+- **Seed** is not locked — `thrindex run --seed N` controls the RNG at inference time.
+
+## The format version
+
+Every artifact carries a format version (`m3` as of THRINDEX 0.2). The version controls the deserializer: a `m3` artifact is rejected by an engine that only supports `m2`. The CLI prints the format version in the run header.
+
+Format versions are additive: `m3` adds fields that `m2` did not have, but any valid `m2` artifact can be represented as a `m3` artifact by filling new fields with defaults.
+
+See [Concepts: Artifact Format](/concepts/artifact-format) for the complete field layout.

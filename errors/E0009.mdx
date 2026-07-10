@@ -1,0 +1,36 @@
+---
+title: "E0009 — IntegrityCheckFailed"
+description: "The artifact's CRC32 checksum does not match. The file was modified after compilation."
+---
+
+<Warning>E0009: artifact integrity check failed (CRC32 mismatch)</Warning>
+
+## What happened
+
+The CRC32 stored in the artifact does not match the CRC32 computed over the artifact's body. The file was modified — either accidentally or intentionally — after `thx.compile()` wrote it.
+
+## Why
+
+Common causes:
+- A text editor opened and re-saved the `.thx` file (changing line endings, encoding)
+- File transfer corruption (truncation, bit flip, encoding conversion)
+- Intentional modification of weights or parameters after compilation
+
+## How to fix
+
+1. **Recompile** the model from the Python source: `thx.compile(model, "model.thx")`.
+2. If you received the artifact from an external source, download it again. Verify its checksum against the published value.
+3. Never attempt to edit `.thx` files manually. They are sealed artifacts, not configuration files.
+
+## Example
+
+```
+E0009: artifact integrity check failed (CRC32 mismatch)
+Why: the artifact file was corrupted after it was compiled.
+Fix: recompile or re-download the artifact.
+Docs: https://docs.thrindex.com/errors/E0009
+```
+
+## Note on intentional modification
+
+If you need to change model parameters (weights, threshold, tau_mem), you must do so in Python and recompile. The `.thx` artifact is a sealed, versioned record of a specific model state. It is not a mutable configuration file.

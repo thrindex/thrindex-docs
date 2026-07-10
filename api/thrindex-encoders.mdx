@@ -1,0 +1,120 @@
+---
+title: "thrindex.encoders"
+description: "Input encoding utilities: rate coding, temporal contrast, cochlear filter bank."
+---
+
+## Import
+
+```python
+import thrindex.encoders as enc
+```
+
+Encoders convert raw input data into spike rasters suitable for THRINDEX models. Every encoder produces a tensor of shape `[batch, T, n_features]` with values in {0, 1}.
+
+## enc.rate_encode
+
+Encodes real-valued input as a Poisson spike process over T timesteps.
+
+```python
+spikes = enc.rate_encode(
+    x: torch.Tensor,          # [batch, n_features], values in [0, 1]
+    T: int,
+    seed: int | None = None,
+) -> torch.Tensor              # [batch, T, n_features], binary
+```
+
+**Parameters**
+
+| Name | Type | Description |
+|---|---|---|
+| `x` | `Tensor[batch, n]` | Input firing rates, normalized to [0, 1] |
+| `T` | `int` | Number of timesteps |
+| `seed` | `int \| None` | Optional RNG seed for reproducibility |
+
+**Behavior**
+
+Each input value `x[b, i]` is treated as a probability: at each timestep `t`, neuron `i` fires with probability `x[b, i]`. The output is a Bernoulli sample over `[batch, T, n_features]`.
+
+```python
+import torch
+import thrindex.encoders as enc
+
+x = torch.rand(4, 784)           # 4 MNIST samples, normalized
+spikes = enc.rate_encode(x, T=100, seed=42)
+# spikes: [4, 100, 784], binary
+```
+
+## enc.temporal_contrast
+
+Encodes a temporal signal (audio, sensor) using temporal contrast: a spike is emitted when the signal changes by more than a threshold, with separate ON (increase) and OFF (decrease) channels.
+
+```python
+spikes = enc.temporal_contrast(
+    x: torch.Tensor,          # [batch, T_input, n_features]
+    threshold: float = 0.1,
+    cumulative: bool = True,
+) -> torch.Tensor              # [batch, T_input, 2 × n_features], binary
+```
+
+**Parameters**
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `x` | `Tensor[batch, T, n]` | — | Input signal time series |
+| `threshold` | `float` | `0.1` | Minimum change required to emit a spike |
+| `cumulative` | `bool` | `True` | If True, tracks accumulated change; if False, frame-to-frame difference only |
+
+**Output channels**
+
+The output has `2 × n_features` channels:
+- Channels `0..n`: ON events (signal increased by ≥ threshold)
+- Channels `n..2n`: OFF events (signal decreased by ≥ threshold)
+
+This matches the DVS event camera polarity convention.
+
+## enc.cochlear_encode
+
+Encodes an audio waveform through a bank of bandpass filters (cochlear model) into a spike raster. Produces the SHD-compatible encoding used in the keyword-spotting tutorial.
+
+```python
+spikes = enc.cochlear_encode(
+    waveform: torch.Tensor,   # [batch, n_samples], 16kHz audio
+    n_channels: int = 700,
+    T: int = 100,
+    freq_min: float = 100.0,
+    freq_max: float = 8000.0,
+) -> torch.Tensor              # [batch, T, n_channels], binary
+```
+
+**Parameters**
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `waveform` | `Tensor[batch, n_samples]` | — | Raw 16kHz audio signal |
+| `n_channels` | `int` | `700` | Number of frequency channels (matches SHD) |
+| `T` | `int` | `100` | Number of output timesteps |
+| `freq_min` | `float` | `100.0` | Lowest frequency channel center (Hz) |
+| `freq_max` | `float` | `8000.0` | Highest frequency channel center (Hz) |
+
+**Notes**
+
+- Frequency bands are spaced logarithmically between `freq_min` and `freq_max`.
+- Each channel fires when the bandpass-filtered signal exceeds its local threshold (set at 2σ from the silence baseline).
+- This encoder is consistent with the SHD dataset's cochlear model but is independently implemented.
+
+## enc.SHDLoader
+
+A dataset loader that returns pre-encoded SHD spike rasters directly.
+
+```python
+from thrindex.encoders import SHDLoader
+
+train_set = SHDLoader(root="/path/to/shd", split="train", T=100)
+test_set  = SHDLoader(root="/path/to/shd", split="test", T=100)
+
+x, y = train_set[0]
+# x: [100, 700], binary
+# y: int, class label 0–19
+```
+
+`SHDLoader` downloads and caches the dataset from the official source on first use. It returns pre-binned spike rasters in the THRINDEX-native format.
