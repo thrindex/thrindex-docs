@@ -3,14 +3,14 @@
   "theme": "mint",
   "name": "thrindex",
   "colors": {
-    "primary": "#D97706",
-    "light": "#F59E0B",
-    "dark": "#B45309"
+    "primary": "#F4F1EC",
+    "light": "#F4F1EC",
+    "dark": "#E8E3DA"
   },
   "favicon": "/logo/icon.png",
   "logo": {
-    "light": "/logo/light.png",
-    "dark": "/logo/dark.png"
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
   },
   "navbar": {
     "links": [
