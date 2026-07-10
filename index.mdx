@@ -1,27 +1,16 @@
 ---
-title: "thrindex"
+title: "THRINDEX"
 description: "A compiler and runtime for spiking neural networks. Author models in Python. Run them on neuromorphic hardware."
-mode: "custom"
-paginationNavigation: false
 ---
 
-<div className="w-full px-6 md:px-12 lg:px-20 py-16 md:py-24">
-  <div className="w-full max-w-none">
-    <p className="text-xs uppercase tracking-[0.14em] text-[#5C574F] dark:text-[#8A8680] mb-6">
-      Compiler & runtime for spiking neural networks
-    </p>
+<img
+  className="block dark:hidden"
+  src="/logo/light.svg"
+  alt="THRINDEX"
+  style={{ height: "48px", marginBottom: "2rem" }}
+/>
 
-    <h1 className="text-5xl md:text-7xl lg:text-8xl font-semibold tracking-[-0.03em] text-[#141414] dark:text-[#F3EDE3] mb-8 leading-[0.95]">
-      thrindex
-    </h1>
-
-    <p className="text-base md:text-lg text-[#5C574F] dark:text-[#D8D4CC] max-w-3xl mb-12 leading-relaxed">
-      Author models in Python using familiar PyTorch-style primitives, compile them to a sealed artifact,
-      and run them through a behavioral simulator or neuromorphic hardware backend — with the same command,
-      the same output format, and the same conformance guarantee.
-    </p>
-  </div>
-</div>
+THRINDEX is an open-source toolchain for spiking neural networks. You author models in Python using familiar PyTorch-style primitives, compile them to a sealed artifact, and run them through a behavioral simulator or a neuromorphic hardware backend — with the same command, the same output format, and the same conformance guarantee.
 
 ```bash
 pip install thrindex
@@ -45,32 +34,23 @@ thx.compile(model, "model.thx")
 thrindex run model.thx
 ```
 
-<div className="w-full px-6 md:px-12 lg:px-20 pb-16 md:pb-24">
-  <div className="w-full max-w-none">
-    <CardGroup cols={2}>
-      <Card title="Get started" icon="rocket" href="/getting-started/installation">
-        Install THRINDEX and run your first model in under five minutes.
-      </Card>
-      <Card title="Systems" icon="cpu" href="/systems/overview">
-        Robotics, drones, aerospace, defense — where physics decides the stack.
-      </Card>
-      <Card title="Learn about SNNs" icon="brain" href="/learn/spiking-neural-networks">
-        Spiking neural networks from first principles — biology, mathematics, and code.
-      </Card>
-      <Card title="Conformance" icon="shield-check" href="/conformance/overview">
-        What THRINDEX Certified means and how backends earn the badge.
-      </Card>
-    </CardGroup>
+<CardGroup cols={2}>
+  <Card title="Learn about SNNs" icon="brain" href="/learn/spiking-neural-networks">
+    Spiking neural networks from first principles — biology, mathematics, and code.
+  </Card>
+  <Card title="Get started" icon="rocket" href="/getting-started/installation">
+    Install THRINDEX and run your first model in under five minutes.
+  </Card>
+  <Card title="Tutorials" icon="code" href="/tutorials/keyword-spotting">
+    End-to-end examples: keyword spotting, event-camera vision, anomaly detection.
+  </Card>
+  <Card title="Conformance" icon="shield-check" href="/conformance/overview">
+    What THRINDEX Certified means and how backends earn the badge.
+  </Card>
+</CardGroup>
 
-    <div className="mt-16 pt-12 border-t border-[#E8E0D4] dark:border-[#2A2A2A] max-w-3xl">
-      <h2 className="text-lg font-semibold text-[#141414] dark:text-[#F3EDE3] mb-4">
-        What THRINDEX is not
-      </h2>
-      <ul className="space-y-3 text-[#5C574F] dark:text-[#D8D4CC] text-sm leading-relaxed">
-        <li>It is not a general-purpose deep learning framework. It targets spiking neural networks specifically.</li>
-        <li>It does not hide the spike raster. The output of every run is a structured transcript you can inspect, diff, and test.</li>
-        <li>It does not abstract away the hardware. It gives you a deterministic model of what will happen on the target, and a conformance guarantee that bounds the divergence from that model.</li>
-      </ul>
-    </div>
-  </div>
-</div>
+## What THRINDEX is not
+
+- It is not a general-purpose deep learning framework. It targets spiking neural networks specifically.
+- It does not hide the spike raster. The output of every run is a structured transcript you can inspect, diff, and test.
+- It does not abstract away the hardware. It gives you a deterministic model of what will happen on the target, and a conformance guarantee that bounds the divergence from that model.

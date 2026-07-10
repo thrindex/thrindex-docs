@@ -3,11 +3,11 @@
   "theme": "almond",
   "name": "thrindex",
   "colors": {
-    "primary": "#141414",
-    "light": "#5C574F",
-    "dark": "#8A8680"
+    "primary": "#F4F1EC",
+    "light": "#F4F1EC",
+    "dark": "#E8E3DA"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "/logo/icon.png",
   "logo": {
     "light": "/logo/light.svg",
     "dark": "/logo/dark.svg"
