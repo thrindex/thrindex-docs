@@ -54,14 +54,9 @@
               "concepts/delays",
               "concepts/artifact-format"
             ]
-          }
-        ]
-      },
-      {
-        "tab": "Systems",
-        "groups": [
+          },
           {
-            "group": "Use Cases",
+            "group": "Systems",
             "pages": [
               "systems/overview",
               "systems/robotics",
@@ -69,50 +64,19 @@
               "systems/aerospace-space",
               "systems/defense"
             ]
-          }
-        ]
-      },
-      {
-        "tab": "Learn",
-        "groups": [
+          },
           {
-            "group": "Spiking Neural Networks",
-            "pages": [
-              "learn/spiking-neural-networks",
-              "learn/leaky-integrate-and-fire",
-              "learn/surrogate-gradients",
-              "learn/time-in-snn",
-              "learn/neuromorphic-hardware",
-              "learn/energy-model"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "API Reference",
-        "groups": [
-          {
-            "group": "Python SDK",
+            "group": "API Reference",
             "pages": [
               "api/python-sdk",
               "api/thrindex-snn",
               "api/thrindex-encoders",
-              "api/thrindex-train"
+              "api/thrindex-train",
+              "api/cli"
             ]
           },
           {
-            "group": "CLI",
-            "pages": [
-              "api/cli"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "Errors",
-        "groups": [
-          {
-            "group": "Error Reference",
+            "group": "Errors",
             "pages": [
               "errors/index",
               "errors/E0001",
@@ -143,14 +107,9 @@
               "errors/E0207",
               "errors/E0208"
             ]
-          }
-        ]
-      },
-      {
-        "tab": "Benchmarks",
-        "groups": [
+          },
           {
-            "group": "Results",
+            "group": "Benchmarks",
             "pages": [
               "benchmarks/mnist",
               "benchmarks/spiking-heidelberg-digits",
@@ -163,6 +122,22 @@
               "conformance/overview",
               "conformance/envelope-v0",
               "conformance/adding-a-backend"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Learn",
+        "groups": [
+          {
+            "group": "Spiking Neural Networks",
+            "pages": [
+              "learn/spiking-neural-networks",
+              "learn/leaky-integrate-and-fire",
+              "learn/surrogate-gradients",
+              "learn/time-in-snn",
+              "learn/neuromorphic-hardware",
+              "learn/energy-model"
             ]
           }
         ]
