@@ -1,12 +1,17 @@
 ---
 title: "THRINDEX"
+description: "The open compiler for spiking neuromorphic compute."
 sidebarTitle: "Home"
 mode: "wide"
+paginationNavigation: false
+keywords:
+  - spiking neural networks
+  - neuromorphic compute
+  - compiler
+  - thrindex
 ---
 
-# The open compiler for spiking neuromorphic compute.
-
-Author models in PyTorch. Compile to a sealed artifact. Run on the simulator or neuromorphic hardware — same command, same output, same conformance guarantee.
+Author models in PyTorch. Compile to a sealed `.thx` artifact. Run on the behavioral simulator or neuromorphic hardware — same command, same transcript, same conformance contract.
 
 <CardGroup cols={3}>
   <Card title="Deterministic" icon="lock">
@@ -16,13 +21,11 @@ Author models in PyTorch. Compile to a sealed artifact. Run on the simulator or 
     Energy scales with spike count, not model size. Silent inputs cost nothing.
   </Card>
   <Card title="Hardware-portable" icon="microchip">
-    Compile once. Run on the simulator. Deploy the same artifact to neuromorphic silicon.
+    Compile once. Validate on the simulator. Deploy the same artifact to neuromorphic silicon.
   </Card>
 </CardGroup>
 
----
-
-## From Python to hardware in three steps
+## From Python to hardware
 
 ```bash
 pip install thrindex
@@ -32,7 +35,6 @@ pip install thrindex
 import thrindex as thx
 import thrindex.snn as snn
 
-# 1. Author
 model = snn.Sequential(
     snn.Dense(700, 512),
     snn.LIF(tau_mem=20.0, threshold=0.3),
@@ -40,39 +42,33 @@ model = snn.Sequential(
     snn.LIF(tau_mem=20.0, threshold=0.3),
 )
 
-# 2. Compile — resolves tau_mem → alpha, seals with CRC32
 thx.compile(model, "model.thx")
 ```
 
 ```bash
-# 3. Run — simulator or hardware, same command
 thrindex run model.thx
 ```
-
----
 
 ## Built for systems where physics decides the stack
 
 <CardGroup cols={2}>
   <Card title="Robotics" icon="robot" href="/systems/robotics">
-    Sub-millisecond sensor-to-actuator loops. The network is quiet when the arm is still.
+    Sub-millisecond sensor-to-actuator loops. Event-driven — quiet when the arm is still.
   </Card>
   <Card title="Drones & UAVs" icon="plane" href="/systems/drones-uavs">
     Energy scales with information rate. Onboard inference without GPU-class power.
   </Card>
   <Card title="Aerospace & Space" icon="satellite" href="/systems/aerospace-space">
-    Finite power for years. No cloud. Verifiable before launch. Sealed artifacts, forever.
+    Finite power for years. No cloud. Verifiable before launch.
   </Card>
   <Card title="Defense" icon="shield" href="/systems/defense">
     Reproducible builds, offline verification, evidence packages auditors can review.
   </Card>
 </CardGroup>
 
----
-
 ## THRINDEX Certified
 
-Every hardware backend earns its badge by passing the conformance harness against `CONFORMANCE_ENVELOPE_V0` — a precisely derived bound on how far a backend's outputs can diverge from the float reference simulator.
+Hardware backends earn the badge by passing the conformance harness against `CONFORMANCE_ENVELOPE_V0` — a derived bound on divergence from the float reference simulator.
 
 | Metric | Threshold | Meaning |
 |---|---|---|
@@ -80,17 +76,13 @@ Every hardware backend earns its badge by passing the conformance harness agains
 | `T_max` (p99) | ≤ 0.130 | Worst-neuron error ≤ 13% |
 | `P_pred` | ≥ 0.900 | ≥ 90% of predictions agree |
 
-The reference simulator passes with T_mean = 0, T_max = 0, P_pred = 1.0. The badge is a contract, not a claim.
-
 [Read the conformance spec →](/conformance/envelope-v0)
-
----
 
 ## What THRINDEX is not
 
-- **Not a general-purpose framework.** It targets spiking neural networks on neuromorphic hardware specifically.
-- **Not a black box.** The output of every run is a structured transcript — spike counts, syn-ops, energy estimate — you can inspect, diff, and test.
-- **Not an abstraction over hardware.** It gives you a deterministic model of what will happen on the target, and a conformance bound on the divergence.
+- **Not a general-purpose framework.** Spiking neural networks on neuromorphic hardware — specifically.
+- **Not a black box.** Every run prints a structured transcript: spike counts, syn-ops, energy estimate.
+- **Not an abstraction over hardware.** A deterministic model of what happens on the target, with a conformance bound on divergence.
 
 <CardGroup cols={2}>
   <Card title="Get started" icon="rocket" href="/getting-started/installation">
