@@ -4,8 +4,8 @@
   "name": "THRINDEX",
   "colors": {
     "primary": "#141414",
-    "light": "#5C574F",
-    "dark": "#3D3A36"
+    "light": "#F3EDE3",
+    "dark": "#141414"
   },
   "favicon": "/logo/light.svg",
   "logo": {
