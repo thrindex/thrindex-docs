@@ -41,4 +41,4 @@ Open a pull request against `main`. Error pages (`errors/E####.mdx`) must match 
 
 ## License
 
-See [LICENSE](LICENSE).
+Apache License 2.0. Copyright 2026 THRINDEX. See [LICENSE](LICENSE).
