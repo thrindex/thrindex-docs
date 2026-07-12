@@ -1,55 +1,66 @@
-# Mintlify Starter Kit
+# THRINDEX Documentation
 
-Use the starter kit to get your docs deployed and ready to customize.
+Public documentation for [THRINDEX](https://github.com/thrindex/thrindex) — the open compiler for spiking neuromorphic compute.
 
-Click the green **Use this template** button at the top of this repo to copy the Mintlify starter kit. The starter kit contains examples with
+**Live site:** [docs.thrindex.com](https://docs.thrindex.com)
 
-- Guide pages
-- Navigation
-- Customizations
-- API reference pages
-- Use of popular components
+## What this repository is
 
-**[Follow the full quickstart guide](https://starter.mintlify.com/quickstart)**
+This repo is the source for the THRINDEX documentation site. It is published via [Mintlify](https://mintlify.com) and linked from the main [thrindex](https://github.com/thrindex/thrindex) monorepo as a git submodule.
 
-## AI-assisted writing
+The docs cover:
 
-Set up your AI coding tool to work with Mintlify:
+- Getting started, tutorials, and API reference
+- Systems use cases (robotics, drones, aerospace, defense)
+- SNN education (Learn section)
+- Error reference (`E####` codes)
+- Benchmarks and conformance specification
+
+## Repository structure
+
+```
+docs.json          Site configuration (theme, navigation, branding)
+index.mdx          Home page
+getting-started/   Installation and first model
+tutorials/         End-to-end examples
+concepts/          Compilation, conformance, artifacts, delays
+systems/           Domain use cases
+learn/             Spiking neural network education
+api/               Python SDK and CLI reference
+errors/            Stable E#### error codes
+benchmarks/        Committed validation results
+conformance/       THRINDEX Certified specification
+logo/              Brand assets (light.svg, dark.svg)
+```
+
+## Local preview
+
+Install the Mintlify CLI:
 
 ```bash
-npx skills add https://mintlify.com/docs
-```
-
-This command installs Mintlify's documentation skill for your configured AI tools like Claude Code, Cursor, Windsurf, and others. The skill includes component reference, writing standards, and workflow guidance.
-
-See the [AI tools guides](/ai-tools) for tool-specific setup.
-
-## Development
-
-Install the [Mintlify CLI](https://www.npmjs.com/package/mint) to preview your documentation changes locally. To install, use the following command:
-
-```
 npm i -g mint
 ```
 
-Run the following command at the root of your documentation, where your `docs.json` is located:
+From the repository root:
 
-```
+```bash
 mint dev
 ```
 
-View your local preview at `http://localhost:3000`.
+Open [http://localhost:3000](http://localhost:3000).
 
-## Publishing changes
+## Contributing
 
-Install our GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app) to propagate changes from your repo to your deployment. Changes are deployed to production automatically after pushing to the default branch.
+Documentation changes are made in this repository. The main THRINDEX codebase lives at [github.com/thrindex/thrindex](https://github.com/thrindex/thrindex).
 
-## Need help?
+When updating docs:
 
-### Troubleshooting
+1. Edit the relevant `.mdx` file
+2. Preview locally with `mint dev`
+3. Open a pull request against `main`
 
-- If your dev environment isn't running: Run `mint update` to ensure you have the most recent version of the CLI.
-- If a page loads as a 404: Make sure you are running in a folder with a valid `docs.json`.
+Error pages (`errors/E####.mdx`) must match the stable error strings in the Rust source — codes are never reused.
 
-### Resources
-- [Mintlify documentation](https://mintlify.com/docs)
+## License
+
+See [LICENSE](LICENSE).
