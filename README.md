@@ -6,7 +6,7 @@ Public documentation for [THRINDEX](https://github.com/thrindex/thrindex) — th
 
 ## What this repository is
 
-This repo is the source for the THRINDEX documentation site. It is published via [Mintlify](https://mintlify.com) and linked from the main [thrindex](https://github.com/thrindex/thrindex) monorepo as a git submodule.
+Source for the THRINDEX documentation site, maintained alongside the main [thrindex](https://github.com/thrindex/thrindex) monorepo.
 
 The docs cover:
 
@@ -33,33 +33,11 @@ conformance/       THRINDEX Certified specification
 logo/              Brand assets (light.svg, dark.svg)
 ```
 
-## Local preview
-
-Install the Mintlify CLI:
-
-```bash
-npm i -g mint
-```
-
-From the repository root:
-
-```bash
-mint dev
-```
-
-Open [http://localhost:3000](http://localhost:3000).
-
 ## Contributing
 
-Documentation changes are made in this repository. The main THRINDEX codebase lives at [github.com/thrindex/thrindex](https://github.com/thrindex/thrindex).
+Documentation changes are made here. The main codebase lives at [github.com/thrindex/thrindex](https://github.com/thrindex/thrindex).
 
-When updating docs:
-
-1. Edit the relevant `.mdx` file
-2. Preview locally with `mint dev`
-3. Open a pull request against `main`
-
-Error pages (`errors/E####.mdx`) must match the stable error strings in the Rust source — codes are never reused.
+Open a pull request against `main`. Error pages (`errors/E####.mdx`) must match the stable error strings in the Rust source — codes are never reused.
 
 ## License
 
