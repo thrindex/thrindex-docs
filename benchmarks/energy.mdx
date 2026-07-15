@@ -1,55 +1,86 @@
 ---
-title: "Energy Model"
-description: "How THRINDEX estimates energy, the formula, the default coefficient, and worked examples."
+title: "Energy & Latency"
+description: "Measured synaptic operation counts and modeled energy comparison — THRINDEX SNN vs dense MLP baselines on SHD keyword spotting."
 ---
 
-See also: [Learn: The Energy Model](/learn/energy-model) for background on neuromorphic energy accounting.
+<Warning>
+All energy values on this page are **modeled** from operation counts and published per-operation coefficients. They have not been measured on physical hardware. Silicon-measured power requires the M6 bring-up. See [METHODOLOGY.md](https://github.com/thrindex/thrindex/blob/main/benchmarks/METHODOLOGY.md) for full coefficient provenance.
+</Warning>
 
-## Formula
+## Task
+
+SHD keyword spotting — the same model and samples used in the [SHD benchmark](/benchmarks/spiking-heidelberg-digits).
 
 ```
-energy_pJ = Σ_layer (pre_spikes_in_layer × fan_out_of_layer) × coefficient_pJ
+Dense(700 → 512) → LIF(τ_mem=20ms) → Dense(512 → 20) → LIF(τ_mem=20ms)
+T = 100 timesteps  |  3 bundled SHD test samples  |  thrindex CPU simulator
 ```
 
-| Symbol | Meaning |
+Run date: 2026-07-16. Hardware: Apple M4 Pro (CPU, single sample, single thread).
+
+## Energy results
+
+### SNN via thrindex
+
+| Metric | Value |
 |---|---|
-| `pre_spikes_in_layer` | Spike events from the pre-synaptic population across all timesteps |
-| `fan_out_of_layer` | Post-synaptic connections per neuron (= `out_features` for Dense, `out_channels × kH × kW` for Conv2d) |
-| `coefficient_pJ` | Energy per synaptic operation (default: **0.5 pJ/syn-op**) |
+| Avg synaptic operations | 3,664,877 |
+| Avg firing rate | 9.9% of dense maximum |
+| **Modeled energy** | **1,832 nJ** |
+| Coefficient | 0.5 pJ/syn-op (7nm neuromorphic silicon reference) |
+| Sim wall time | 14.2 ms (CPU simulator — not the deployment target) |
 
-The product `pre_spikes × fan_out` is the number of **synaptic operations** (multiply-accumulates triggered by spikes). This is the standard neuromorphic energy metric.
+### Dense MLP baselines
 
-## Worked example
+| Baseline | MACs | GPU energy (2.56 pJ/MAC) | CPU energy (1.0 pJ/MAC) |
+|---|---|---|---|
+| A — Rate-collapsed (1 frame, loses temporal info) | 368,640 | 944 nJ | 369 nJ |
+| B — Temporal (T=100 passes, same info as SNN) | 36,864,000 | 94,372 nJ | 36,864 nJ |
 
-`Dense(700→512) → LIF → Dense(512→20) → LIF`, 100 timesteps, 10% spike rate:
+### Energy ratios vs SNN
+
+| Comparison | GPU ratio | CPU ratio | Notes |
+|---|---|---|---|
+| **Temporal MLP vs SNN** | **51.5×** | **20.1×** | Apples-to-apples — same temporal information |
+| Rate-collapsed MLP vs SNN | 0.5× | 0.2× | Not apples-to-apples — MLP discards timing |
+
+**The apples-to-apples comparison is Baseline B (temporal MLP).** Both systems process 100 timesteps of temporal data from the same input. The SNN triggers only 3.7M syn-ops (9.9% firing) vs 36.9M MACs (100% dense) — a 10× reduction in operations at the same information budget.
+
+At 0.5 pJ/syn-op (neuromorphic) vs 2.56 pJ/MAC (GPU), the combined advantage is **51.5×** on modeled energy.
+
+## Why rate-collapsed MLP is not a fair baseline
+
+Baseline A processes the **mean spike rate** across 100 timesteps — a single 700-dimensional vector. The timing information in the spike pattern is discarded. This approach:
+
+- Cannot distinguish two inputs with the same rate but different temporal structure
+- Would achieve significantly lower accuracy on SHD than the SNN (SHD specifically rewards temporal processing)
+- Uses 100× fewer operations by throwing away 99% of the input data
+
+A rate-collapsed MLP with equivalent accuracy would require a substantially larger architecture.
+
+## Latency note
+
+The SNN simulator wall time (14.2 ms) reflects the **thrindex CPU simulation tool** — a debug and validation artifact, not the deployment target. Neuromorphic silicon operates at hardware speed, typically 10–100× faster than an equivalent CPU simulation.
+
+The MLP wall times (Baseline A: 0.012 ms, Baseline B: 1.18 ms) are measured on the same CPU for a consistent comparison point.
+
+**No latency comparison between neuromorphic hardware and GPU is made here.** That comparison requires M6 silicon bring-up.
+
+## Reproducing
+
+```bash
+pip install thrindex
+python benchmarks/run_benchmark.py
+```
+
+Writes machine-readable results to `benchmarks/results/shd.json`. No external dataset download required — the three SHD samples are bundled in the repository.
+
+## Energy formula
 
 ```
-Layer 1 (Dense 700→512):
-  pre_spikes  = 700 × 100 × 0.10 = 7,000
-  fan_out     = 512
-  ops         = 7,000 × 512 = 3,584,000
-
-Layer 3 (Dense 512→20):
-  pre_spikes  = 512 × 100 × 0.10 = 5,120
-  fan_out     = 20
-  ops         = 5,120 × 20 = 102,400
-
-Total ops   = 3,686,400
-Energy      = 3,686,400 × 0.5 pJ/syn-op = 1.84 µJ
+E_snn = syn_ops × coeff_pJ
+      = 3,664,877 × 0.5 pJ/syn-op
+      = 1,832 nJ
 ```
 
-LIF layers have no synaptic weights and contribute no ops.
-
-## The coefficient
-
-**0.5 pJ/syn-op** is the default. It is consistent with published neuromorphic silicon figures from 7nm digital processes. It is not calibrated to any specific device or operating point.
-
-To override: `thrindex run model.thx --energy-coeff 3.0` (units: pJ/syn-op).
-
-## What the estimate captures and does not capture
-
-**Captures:** the spike-driven efficiency advantage. Energy scales with spike count, not model parameter count. A feedforward ANN with the same parameter count processes all multiplications every timestep — roughly `1/spike_rate` more energy for the same architecture at 10% activity.
-
-**Does not capture:** memory access energy, on-chip routing energy, chip idle power, host interface overhead, or system-level power.
-
-**Not a silicon measurement.** For hardware-measured power, see the device datasheet for your target chip.
+where `syn_ops` = multiply-accumulates actually triggered by spikes (not the full dense count). See [the energy model page](/learn/energy-model) for formula derivation and the [Benchmarks methodology](https://github.com/thrindex/thrindex/blob/main/benchmarks/METHODOLOGY.md) for coefficient provenance.
