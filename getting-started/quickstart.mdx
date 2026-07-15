@@ -40,31 +40,22 @@ thrindex run model.thx
 ```
 
 ```
-═══════════════════════════════════════════════════════════════
- thrindex run  ·  model.thx
- format:  m3  ·  target: sim  ·  seed: 0
-═══════════════════════════════════════════════════════════════
- input:          [100 × 700]
- output:         [100 × 20]
- synaptic_ops:   124800
- wall_time_ms:   8.2
- prediction:     class 7
- spike_counts:   [3 12 47 0 8 ...]
-═══════════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════
+ thrindex 0.3.0  |  target: sim  |  seed: 0
+═══════════════════════════════════════════════════════
+ model:  Dense(700→512) → LIF(τ=20ms) → Dense(512→20) → LIF(τ=20ms)
+ input:  100 timesteps × 700 features
+───────────────────────────────────────────────────────
+ prediction:  class 7  —  rate score 0.312
+───────────────────────────────────────────────────────
+ output spike rate:   3.1%
+ synaptic ops:        16640
+ modeled energy:      8.32 nJ  (coefficient: 0.5 pJ/syn-op)
+ sim wall time:       0.015s
+═══════════════════════════════════════════════════════
 ```
 
 The transcript prints to stdout. It is structured, machine-readable, and snapshot-tested — the format is a contract.
-
-## Or run from Python
-
-```python
-import thrindex as thx
-
-result = thx.run("model.thx")
-print(result.prediction)     # int — argmax of spike counts
-print(result.spike_counts)   # list[int] — one per output neuron
-print(result.synaptic_ops)   # int — total syn-ops
-```
 
 ## Next steps
 
