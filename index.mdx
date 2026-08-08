@@ -11,123 +11,43 @@ keywords:
   - thrindex
 ---
 
-<div style={{textAlign: "center", padding: "48px 0 32px"}}>
-  <div style={{fontSize: "13px", fontWeight: "600", letterSpacing: "0.12em", textTransform: "uppercase", color: "#888", marginBottom: "20px"}}>
-    Open compiler for neuromorphic compute
-  </div>
-  <div style={{fontSize: "clamp(32px, 5vw, 56px)", fontWeight: "700", lineHeight: "1.1", letterSpacing: "-0.03em", marginBottom: "24px"}}>
-    Author. Compile. Run on silicon.
-  </div>
-  <div style={{fontSize: "18px", color: "#666", maxWidth: "560px", margin: "0 auto 40px", lineHeight: "1.6"}}>
-    Write spiking neural networks in Python. Compile to a sealed artifact. Run on the behavioral simulator or neuromorphic hardware — same command, same transcript, same conformance contract.
-  </div>
-  <div style={{display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap"}}>
-    <a href="/getting-started/installation" style={{display: "inline-flex", alignItems: "center", gap: "8px", background: "#141414", color: "#fff", padding: "12px 24px", borderRadius: "8px", fontWeight: "600", fontSize: "15px", textDecoration: "none"}}>
-      Get started →
-    </a>
-    <a href="/getting-started/quickstart" style={{display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: "#141414", padding: "12px 24px", borderRadius: "8px", fontWeight: "600", fontSize: "15px", textDecoration: "none", border: "1.5px solid #e0e0e0"}}>
-      Quickstart
-    </a>
-  </div>
-</div>
-
----
-
-## Three steps. One artifact.
-
-<Steps>
-  <Step title="Install">
-    ```bash
-    pip install thrindex
-    ```
-  </Step>
-  <Step title="Build and compile">
-    ```python
-    import thrindex as thx
-    import thrindex.snn as snn
-
-    model = snn.Sequential(
-        snn.Dense(700, 512),
-        snn.LIF(tau_mem=20.0, threshold=0.3),
-        snn.Dense(512, 20),
-        snn.LIF(tau_mem=20.0, threshold=0.3),
-    )
-
-    thx.compile(model, "model.thx")
-    ```
-  </Step>
-  <Step title="Run">
-    ```bash
-    thrindex run model.thx
-    ```
-
-    ```
-    ═══════════════════════════════════════════════════════
-     thrindex 0.4.0  |  target: sim  |  seed: 0
-    ═══════════════════════════════════════════════════════
-     model:  Dense(700→512) → LIF(τ=20ms) → Dense(512→20) → LIF(τ=20ms)
-     input:  10 timesteps × 700 features
-    ───────────────────────────────────────────────────────
-     prediction:  class 4  —  rate score 0.340
-    ───────────────────────────────────────────────────────
-     output spike rate:   8.5%
-     synaptic ops:        43,776
-     modeled energy:      21.9 nJ  (coefficient: 0.5 pJ/syn-op)
-     sim wall time:       0.001s
-    ═══════════════════════════════════════════════════════
-    ```
-  </Step>
-</Steps>
-
----
-
-## Why THRINDEX
+Author a model. Compile to a sealed `.thx` artifact. Run on the behavioral simulator or neuromorphic hardware — same command, same transcript, same conformance contract.
 
 <CardGroup cols={3}>
-  <Card title="Sealed artifacts" icon="lock">
-    Every `.thx` file carries a CRC32 integrity hash, the target it was compiled for, and all resolved constants. The artifact is the spec and the proof in one file.
+  <Card title="Deterministic" icon="lock">
+    Seeded, reproducible, CRC32-sealed. The artifact is the spec and the implementation in one file.
   </Card>
   <Card title="Energy-proportional" icon="bolt">
-    Energy scales with spike count, not model size. Silent inputs cost nothing. THRINDEX reports modeled energy on every run.
+    Energy scales with spike count, not model size. Silent inputs cost nothing.
   </Card>
-  <Card title="Real hardware" icon="microchip">
-    Compile once. Validate on the simulator. Deploy the same artifact to a BrainChip AKD1500 — or any future backend that passes the conformance harness.
+  <Card title="Hardware-portable" icon="microchip">
+    Compile once. Validate on the simulator. Deploy the same artifact to neuromorphic silicon.
   </Card>
 </CardGroup>
 
----
+## Author, compile, run
 
-## Targets
+```bash
+pip install thrindex
+```
 
-<Tabs>
-  <Tab title="Simulator (sim)">
-    The default target. Full LIF dynamics, any number of timesteps, no hardware required.
+```python
+import thrindex as thx
+import thrindex.snn as snn
 
-    ```python
-    thx.compile(model, "model.thx", target="sim")
-    thrindex run model.thx
-    ```
+model = snn.Sequential(
+    snn.Dense(700, 512),
+    snn.LIF(tau_mem=20.0, threshold=0.3),
+    snn.Dense(512, 20),
+    snn.LIF(tau_mem=20.0, threshold=0.3),
+)
 
-    - Supports LIF neurons, synaptic delays, Conv2d
-    - Deterministic with a fixed seed
-    - Runs on any machine with `pip install thrindex`
-  </Tab>
-  <Tab title="AKD1500 (akida-akd1500)">
-    BrainChip's AKD1500 neuromorphic processor. Dense and Conv2d layers, 4-bit integer weights, single-frame spatial inference.
+thx.compile(model, "model.thx")
+```
 
-    ```python
-    thx.compile(model, "model.thx", target="akida-akd1500")
-    ```
-
-    - Requires Dense / Conv2d only — no LIF layers ([E0401](/errors/E0401))
-    - 4-bit signed weights in `[-7, 7]`
-    - Deployed via the `akida-runtime` binary on the device
-
-    [Hardware deployment guide →](/systems/hardware-targets)
-  </Tab>
-</Tabs>
-
----
+```bash
+thrindex run model.thx
+```
 
 ## Built for systems where physics decides the stack
 
@@ -146,8 +66,6 @@ keywords:
   </Card>
 </CardGroup>
 
----
-
 ## THRINDEX Certified
 
 Hardware backends earn the badge by passing the conformance harness against `CONFORMANCE_ENVELOPE_V0` — a derived bound on divergence from the float reference simulator.
@@ -158,23 +76,17 @@ Hardware backends earn the badge by passing the conformance harness against `CON
 | `T_max` (p99) | ≤ 0.130 | Worst-neuron error ≤ 13% |
 | `P_pred` | ≥ 0.900 | ≥ 90% of predictions agree |
 
-The conformance harness runs against a frozen 120-sample fixture set (CRC32 `e2ebd845`). Non-SNN backends that do not implement LIF dynamics are explicitly excluded from the harness — the exclusion is printed, never silent.
-
 [Read the conformance spec →](/conformance/envelope-v0)
-
----
 
 ## What THRINDEX is not
 
-- **Not a general-purpose ML framework.** Spiking neural networks on neuromorphic hardware — specifically.
-- **Not a black box.** Every run prints a structured transcript: spike counts, syn-ops, energy estimate, wall time.
+- **Not a general-purpose framework.** Spiking neural networks on neuromorphic hardware — specifically.
+- **Not a black box.** Every run prints a structured transcript: spike counts, syn-ops, energy estimate.
 - **Not an abstraction over hardware.** A deterministic model of what happens on the target, with a conformance bound on divergence.
 
----
-
 <CardGroup cols={2}>
-  <Card title="Get started in 5 minutes" icon="rocket" href="/getting-started/installation">
-    Install THRINDEX, compile your first model, and run it on the simulator.
+  <Card title="Get started" icon="rocket" href="/getting-started/installation">
+    Install THRINDEX and run your first model in under five minutes.
   </Card>
   <Card title="Learn about SNNs" icon="brain" href="/learn/spiking-neural-networks">
     Spiking neural networks from first principles — biology, mathematics, and code.
