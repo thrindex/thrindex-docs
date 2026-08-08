@@ -11,7 +11,7 @@ import thrindex.snn as snn
 
 ## snn.Sequential
 
-A sequential container. Layers are applied in the order they are defined. The input propagates through each layer across all T timesteps.
+A temporally-unrolled SNN container. Applies layers in order across all `T` timesteps. Owns and threads LIF state across timesteps — callers do not manage membrane tensors directly.
 
 ```python
 model = snn.Sequential(*layers)
@@ -23,22 +23,45 @@ model = snn.Sequential(*layers)
 |---|---|---|
 | `*layers` | `nn.Module` | Ordered layers. Any THRINDEX layer or standard `torch.nn` module. |
 
+**Input / Output shape**
+
+- Input: `[T, batch, in_features]` — time-first
+- Output: `[T, batch, out_features]` — time-first, spike raster of the last layer
+
 **Notes**
 
-- `Sequential` is compatible with `torch.nn.Sequential` for all standard PyTorch operations: `.parameters()`, `.state_dict()`, `.to(device)`.
-- The first layer in a `Sequential` determines the model's input dimension, which is stored in the `.thx` artifact.
+- `Sequential` is a `torch.nn.Module`. `.parameters()`, `.state_dict()`, `.to(device)`, and all standard PyTorch optimizer integrations work as expected.
+- LIF state is reset to zero at the start of every `forward` call. It is not persistent across batches.
+- Non-LIF layers (Dense, Conv2d, standard `torch.nn` modules) are called without state at each timestep.
+
+**Example**
+
+```python
+import thrindex.snn as snn
+import torch
+
+model = snn.Sequential(
+    snn.Dense(784, 512),
+    snn.LIF(tau_mem=10.0),
+    snn.Dense(512, 10),
+    snn.LIF(tau_mem=10.0),
+)
+
+# x: [T=20, batch=32, 784]
+spikes = model(x)  # [T=20, batch=32, 10]
+```
+
+---
 
 ## snn.Dense
 
-A linear (fully-connected) layer. Equivalent to `torch.nn.Linear` but with optional per-connection integer delay support.
+A linear (fully-connected) layer.
 
 ```python
 layer = snn.Dense(
     in_features: int,
     out_features: int,
     bias: bool = True,
-    delays: bool = False,
-    max_delay: int = 15,
 )
 ```
 
@@ -49,12 +72,17 @@ layer = snn.Dense(
 | `in_features` | `int` | — | Input feature dimension |
 | `out_features` | `int` | — | Output feature dimension |
 | `bias` | `bool` | `True` | Whether to include a bias vector |
-| `delays` | `bool` | `False` | Enable per-connection integer delays |
-| `max_delay` | `int` | `15` | Maximum delay in timesteps (stored in artifact as `delay_max`) |
 
 **Weight initialization**
 
-Weights are initialized with Kaiming uniform initialization (fan-in mode), matching `torch.nn.Linear`. Delays, if enabled, are initialized to 1 (one-step propagation, the default).
+Kaiming uniform (fan-in mode), matching `torch.nn.Linear`.
+
+**Notes**
+
+- Equivalent to `torch.nn.Linear`. No temporal state.
+- Applied at every timestep independently.
+
+---
 
 ## snn.LIF
 
@@ -62,11 +90,11 @@ A layer of leaky integrate-and-fire neurons.
 
 ```python
 layer = snn.LIF(
-    tau_mem: float,
+    tau_mem: float = 10.0,
     threshold: float = 1.0,
     tau_syn: float | None = None,
     reset: str = "subtract",
-    dt: float = 1.0,
+    beta: float = 25.0,
 )
 ```
 
@@ -74,28 +102,42 @@ layer = snn.LIF(
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `tau_mem` | `float` | — | Membrane time constant in milliseconds |
-| `threshold` | `float` | `1.0` | Firing threshold |
-| `tau_syn` | `float \| None` | `None` | Synaptic filter time constant in ms. If `None`, no synaptic filter is applied. |
-| `reset` | `str` | `"subtract"` | Reset mode: `"subtract"` (default) or `"zero"` |
-| `dt` | `float` | `1.0` | Simulation timestep in ms. Set once on the model; do not vary across layers. |
+| `tau_mem` | `float` | `10.0` | Membrane time constant in ms. Must be > 1.0 ms. |
+| `threshold` | `float` | `1.0` | Firing threshold (dimensionless) |
+| `tau_syn` | `float \| None` | `None` | Synaptic filter time constant in ms. `None` = single-state LIF. |
+| `reset` | `str` | `"subtract"` | Reset mode after a spike: `"subtract"` or `"zero"` |
+| `beta` | `float` | `25.0` | Slope of the fast-sigmoid surrogate gradient |
 
-**Computed constants (stored in artifact)**
+**Computed constants**
 
-| Name | Formula | Description |
+| Name | Formula | Stored in artifact |
 |---|---|---|
-| `alpha` | `exp(-dt / tau_mem)` | Membrane leak factor |
-| `beta` | `exp(-dt / tau_syn)` | Synaptic filter factor (only if `tau_syn` is set) |
+| `alpha` | `exp(-1.0 / tau_mem)` | Yes |
+| `alpha_syn` | `exp(-1.0 / tau_syn)` | Yes (if `tau_syn` set) |
 
-**Input / Output shapes**
+The simulation timestep is fixed at `dt = 1.0 ms`. It is a class constant (`LIF.DT`), not a constructor parameter.
 
-- Input: `[batch, T, in_features]`
-- Output: `[batch, T, n_neurons]` — binary spike raster (values are exactly 0.0 or 1.0 in the forward pass; gradients are surrogate-smoothed in the backward pass)
+**Per-timestep update**
+
+```
+mem_t   = alpha × mem_prev + x_t      # leak + integrate
+spk_t   = H(mem_t − threshold)         # fire (Heaviside forward, surrogate backward)
+mem_out = mem_t − spk_t × threshold   # reset: subtract mode
+       OR mem_t × (1 − spk_t.detach())  # reset: zero mode
+```
+
+**Reset modes**
+
+- `"subtract"` — membrane potential is reduced by `threshold` on each spike. Gradients flow through the subtraction path.
+- `"zero"` — membrane potential is reset to zero on each spike. The reset mask is detached from the gradient graph.
 
 **Notes**
 
-- `n_neurons` is determined by the `out_features` of the preceding `Dense` layer. There is no `n_neurons` argument — the LIF layer infers its size from the input shape on the first forward call.
-- The membrane state is initialized to zero at the start of each sample. It is not persistent across samples in a batch.
+- LIF has no weight parameters. Its size is inferred from the output of the preceding layer.
+- `tau_mem` must be strictly greater than `1.0 ms`. A time constant at or below the timestep loses all membrane history within a single step.
+- Surrogate gradient: fast-sigmoid. See [Surrogate Gradients](/learn/surrogate-gradients) and [E0101](/errors/E0101).
+
+---
 
 ## snn.Conv2d
 
@@ -125,31 +167,43 @@ layer = snn.Conv2d(
 
 **Input / Output shapes**
 
-- Input: `[batch, T, C_in, H, W]`
-- Output: `[batch, T, C_out, H_out, W_out]`
+- Input per timestep: `[batch, C_in, H, W]`
+- Output per timestep: `[batch, C_out, H_out, W_out]`
 
-## snn.Flatten
+When used inside `Sequential`, the container calls it at each of the `T` timesteps.
 
-Flattens spatial dimensions. Used between convolutional and dense layers.
+---
 
-```python
-layer = snn.Flatten()
-```
+## Training
 
-- Input: `[batch, T, C, H, W]`
-- Output: `[batch, T, C × H × W]`
-
-## Forward pass
-
-All THRINDEX layers process the time dimension in the same way: they iterate over `T` timesteps and apply the layer computation at each step, maintaining any stateful quantities (membrane potential, synaptic current) across timesteps.
-
-The forward pass of a `Sequential` is equivalent to:
+All THRINDEX layers are `torch.nn.Module` subclasses. A standard PyTorch training loop works without modification:
 
 ```python
-x = input_spikes  # [batch, T, in_features]
-for layer in self.layers:
-    x = layer(x)
-# x is now [batch, T, out_features]
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+
+for x, labels in dataloader:
+    # x: [T, batch, in_features]
+    spikes = model(x)                          # [T, batch, n_classes]
+    loss = thrindex.train.rate_loss(spikes, labels)
+    loss.backward()
+    optimizer.step()
+    optimizer.zero_grad()
 ```
 
-Each layer applies its operation at each `t` and passes the result to the next.
+The surrogate gradient (`FastSigmoid`) handles the non-differentiable spike function during `loss.backward()`. BPTT gradients flow through all `T` timesteps automatically via PyTorch autograd.
+
+---
+
+## Compiling a trained model
+
+```python
+import thrindex as thx
+
+# target="sim" — for simulation (default)
+thx.compile(model, "model.thx", target="sim")
+
+# target="akida-akd1500" — for AKD1500 hardware (Dense/Conv2d only, no LIF)
+thx.compile(model, "model.thx", target="akida-akd1500")
+```
+
+See [Hardware Targets](/systems/hardware-targets) for the AKD1500 deployment guide.

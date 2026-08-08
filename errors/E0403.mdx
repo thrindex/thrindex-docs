@@ -1,0 +1,47 @@
+---
+title: "E0403 — NonFiniteWeights"
+description: "A weight tensor in the artifact contains NaN or Inf values that cannot be quantized."
+---
+
+<Warning>E0403: non-finite weights cannot be quantized for akida-akd1500</Warning>
+
+## What happened
+
+A `.thx` artifact was validated against the `akida-akd1500` backend and one of its weight tensors contains one or more `NaN` or `Inf` values. AKD1500 requires integer-quantizable weights; quantization of non-finite floats is undefined.
+
+## Why
+
+The AKD1500 compile path maps `f32` weights to 4-bit signed integers in the range `[-7, 7]` using the scale `max|W| / 7`. If any weight is `NaN` or `Inf`, this scale computation produces `NaN`, and the resulting quantized tensor is garbage. Rather than produce silently incorrect inference output, the backend rejects the artifact at validation time.
+
+Non-finite weights almost always indicate a numerical problem in the training pipeline: exploding gradients, a missing gradient clip, or an unstable loss function.
+
+## How to fix
+
+1. **Identify the source.** Check where in training the weights diverge. Add gradient clipping:
+
+   ```python
+   torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+   ```
+
+2. **Check your loss function** for instability — a `log(0)` or division by zero in the loss will propagate `Inf` through the backward pass.
+
+3. **Re-export the model** after fixing the training issue and verify with:
+
+   ```python
+   for name, param in model.named_parameters():
+       assert torch.isfinite(param).all(), f"{name} contains non-finite values"
+   ```
+
+4. **Recompile** the corrected model for `akida-akd1500`.
+
+## Example
+
+```
+E0403: layer[2] weights_b64 contains non-finite values.
+Observed: 14 NaN or Inf values found in decoded weight tensor.
+Why: AKD1500 requires integer-quantizable weights. Quantization of non-finite
+     floats is undefined and would produce silent garbage output.
+What to do: Check the training pipeline for numerical instability.
+            Re-export the model with finite weights.
+Docs: https://docs.thrindex.com/errors/E0403
+```

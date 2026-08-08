@@ -1,0 +1,53 @@
+---
+title: "E0407 — TemporalInputNotSupported"
+description: "run_batch received inputs with T > 1 timesteps. akida-akd1500 is a stateless single-frame backend that requires T = 1."
+---
+
+<Warning>E0407: akida-akd1500 requires T = 1 per sample</Warning>
+
+## What happened
+
+`run_batch` was called with inputs where at least one sample has more than one timestep (`T > 1`). The `akida-akd1500` backend requires exactly one timestep frame per sample.
+
+## Why
+
+AKD1500 processes **one spatial frame per `model.forward()` call**. It holds no temporal state between calls:
+
+- There is no membrane potential that accumulates across timesteps.
+- There is no recurrent architecture.
+- There is no frame-to-frame buffering.
+
+Iterating `T` frames independently through the same stateless model produces `T` independent feedforward responses. This is **not** equivalent to `T` timesteps of SNN temporal dynamics. A model whose behaviour depends on cross-timestep membrane accumulation will produce silently incorrect output rather than a recognisable error.
+
+E0407 is raised explicitly to prevent that silent failure.
+
+## How to fix
+
+**Pass exactly one timestep frame per sample.** AKD1500 performs spatial inference; the timestep dimension must always be 1:
+
+```python
+# Correct: [N_samples, T=1, features]
+inputs = [[[0.5, 0.2, 0.8, ...]]]  # one sample, one frame
+
+# Incorrect: [N_samples, T=10, features]
+# inputs = [[[...], [...], ...]]  # 10 frames — will raise E0407
+```
+
+**For temporal SNN inference**, use the `sim` backend. The simulator implements full LIF temporal dynamics across any number of timesteps:
+
+```python
+thx.compile(model, "model.thx", target="sim")
+```
+
+## Example
+
+```
+E0407: run_batch received inputs with T=10 timesteps per sample; akida-akd1500 requires T=1.
+Observed: inputs shape [batch=4, T=10, features=700]; T > 1.
+Why: AKD1500 processes one spatial frame per model.forward() call. It holds no temporal
+     state between calls. Iterating T frames independently produces T independent feedforward
+     responses — NOT equivalent to T timesteps of SNN temporal dynamics.
+What to do: Pass exactly one timestep frame per sample: inputs shape [batch, 1, features].
+            For temporal SNN inference, use the 'sim' backend.
+Docs: https://docs.thrindex.com/errors/E0407
+```

@@ -62,6 +62,7 @@
             "group": "Systems",
             "pages": [
               "systems/overview",
+              "systems/hardware-targets",
               "systems/robotics",
               "systems/drones-uavs",
               "systems/aerospace-space",
@@ -108,7 +109,12 @@
               "errors/E0205",
               "errors/E0206",
               "errors/E0207",
-              "errors/E0208"
+              "errors/E0208",
+              "errors/E0401",
+              "errors/E0402",
+              "errors/E0403",
+              "errors/E0404",
+              "errors/E0407"
             ]
           },
           {

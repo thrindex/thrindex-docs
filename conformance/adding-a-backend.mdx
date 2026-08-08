@@ -123,3 +123,19 @@ A backend must be re-certified when:
 - The reference model used in the fixture set changes
 
 The V0 badge is retained in published history but marked superseded once re-certification under V1 completes.
+
+---
+
+## Non-SNN backends: exclusion from the conformance suite
+
+Some hardware targets do not implement spiking neural network dynamics and cannot be measured against the spike-raster metric. These backends are **permanently excluded** from the conformance suite.
+
+When the harness runs, excluded backends are printed rather than silently skipped:
+
+```
+EXCLUDED akida-akd1500: reason=non-snn-backend; metric=top-1-accuracy-frozen-brainchip-dataset
+```
+
+`akida-akd1500` is an example of an excluded backend. AKD1500 executes integer feedforward inference (bounded ReLU); it has no membrane potential and produces no spike raster. The appropriate correctness measure for this backend is top-1 accuracy on the frozen BrainChip dataset, not spike-raster equivalence.
+
+If you are implementing a backend that does not produce LIF-equivalent spike outputs, declare it as an exclusion rather than attempting to pass the harness. The exclusion line must be printed — a conformance standard that silently does not apply is not a standard.

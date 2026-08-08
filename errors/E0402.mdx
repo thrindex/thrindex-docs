@@ -1,0 +1,43 @@
+---
+title: "E0402 — DelaysNotSupported"
+description: "A layer with synaptic delays was found in an artifact compiled for akida-akd1500. AKD1500 has no delay processing hardware."
+---
+
+<Warning>E0402: synaptic delays cannot be mapped to akida-akd1500</Warning>
+
+## What happened
+
+A `.thx` artifact was validated against the `akida-akd1500` backend and one of its layers contains a synaptic delay encoding. The AKD1500 capability descriptor declares `native_delay_max_steps = 0` and `delay_fallback = Reject`, meaning delays are neither supported natively nor emulated.
+
+## Why
+
+AKD1500 is an **Akida 1.0** device. Temporal Neural Processors (TNP) that provide buffered or recurrent delay processing are an Akida 2.0 feature not present on AKD1500. The hardware executes a single feedforward pass per inference call with no per-synapse timing buffers.
+
+There is no mechanism to emulate per-synapse delays in a single-frame feedforward model. Silently dropping delays would produce incorrect output, so the backend rejects the artifact instead.
+
+## How to fix
+
+**Option A — Use the simulator.** The `sim` backend supports delays up to 65535 timesteps natively (`native_delay_max_steps = 65535`, `delay_fallback = Emulate`):
+
+```python
+thx.compile(model, "model.thx", target="sim")
+```
+
+**Option B — Retrain without delays.** Remove the delay encoding from the model before compiling for `akida-akd1500`. This changes the model's temporal behaviour and will require retraining:
+
+```python
+# Remove delays from Dense layers — only use in_features, out_features, bias
+layer = snn.Dense(in_features=512, out_features=256)
+```
+
+## Example
+
+```
+E0402: layer[0] has synaptic delays but akida-akd1500 declares native_delay_max_steps=0.
+Observed: .thx layer 0 has "delays_b64" delay encoding; delay_fallback=Reject per capability descriptor.
+Why: AKD1500 is an Akida 1.0 device. Temporal Neural Processors (TNP) that support
+     buffered or recurrent delay processing are an Akida 2.0 feature not present on AKD1500.
+What to do: Retrain without delays, or target a backend that supports them.
+            The 'sim' backend supports delays up to u16::MAX steps.
+Docs: https://docs.thrindex.com/errors/E0402
+```

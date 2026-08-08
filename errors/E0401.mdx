@@ -1,0 +1,47 @@
+---
+title: "E0401 — LifNotSupported"
+description: "A LIF layer was found in an artifact compiled for akida-akd1500. AKD1500 implements bounded ReLU, not leaky integrate-and-fire."
+---
+
+<Warning>E0401: LIF layer cannot be mapped to akida-akd1500</Warning>
+
+## What happened
+
+A `.thx` artifact was validated against the `akida-akd1500` backend and one of its layers has `type: "lif"`. The AKD1500 hardware does not implement leaky integrate-and-fire (LIF) dynamics and cannot execute this layer.
+
+## Why
+
+AKD1500 implements **Akida 1.0**. Its activation function is a bounded ReLU applied per-inference-call to an integer dot product. It has:
+
+- **No membrane potential** — there is no state variable that accumulates across time.
+- **No exponential leak** — the `alpha = exp(-dt / tau_mem)` term in the LIF equation has no hardware equivalent.
+- **No spike-triggered reset** — the subtract or zero reset modes have no hardware equivalent.
+
+LIF neurons and bounded ReLU are different computational models. There is no lossless conversion between them.
+
+## How to fix
+
+**Option A — Use the simulator.** If you need SNN inference with LIF dynamics, compile for `target="sim"`:
+
+```python
+thx.compile(model, "model.thx", target="sim")
+```
+
+The simulator implements LIF fully, including membrane potential, synaptic dynamics, and both reset modes.
+
+**Option B — Redesign for AKD1500.** AKD1500 runs feedforward integer networks (Dense → ReLU). If you want hardware acceleration and do not need SNN temporal dynamics, redesign the model without LIF layers. Refer to the [BrainChip documentation](https://doc.brainchipinc.com/) for the supported layer types.
+
+There is no automatic model conversion. A model that uses LIF neurons depends on temporal state that does not exist in the AKD1500 execution model.
+
+## Example
+
+```
+E0401: layer[1] type="lif" cannot be mapped to akida-akd1500.
+Observed: .thx layer 1 has type "lif" with threshold=1.0, alpha=0.905, reset="subtract".
+Why: AKD1500 implements Akida 1.0. Akida 1.0's activation is bounded ReLU applied
+     per-inference-call to the integer dot product. It has no membrane potential, no
+     exponential leak (alpha term), and no spike-triggered reset.
+What to do: (a) Use the 'sim' backend for SNN simulation.
+            (b) If you want AKD1500 inference, re-design the model without LIF layers.
+Docs: https://docs.thrindex.com/errors/E0401
+```

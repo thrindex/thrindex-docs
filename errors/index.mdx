@@ -12,6 +12,7 @@ Error codes are organized by subsystem:
 | E0001–E0099 | Simulator (`thrindex-sim`) |
 | E0101–E0199 | Compiler (`thrindex-compiler`) |
 | E0201–E0299 | Conformance / Backend API |
+| E0401–E0499 | AKD1500 backend (`akida-akd1500`) |
 
 Codes are never reused. If an error is retired, its number is reserved.
 
@@ -56,3 +57,13 @@ Codes are never reused. If an error is retired, its number is reserved.
 | [E0206](/errors/E0206) | `OutputShapeMismatch` (harness) | Backend output shape differs from reference (per-sample) |
 | [E0207](/errors/E0207) | `BackendExecution` | Backend returned an error during conformance run |
 | [E0208](/errors/E0208) | `ReferenceError` | Reference simulator errored — indicates a harness bug |
+
+## E04xx — AKD1500 backend
+
+| Code | Name | When |
+|---|---|---|
+| [E0401](/errors/E0401) | `LifNotSupported` | LIF layer in artifact — AKD1500 uses bounded ReLU, not LIF |
+| [E0402](/errors/E0402) | `DelaysNotSupported` | Synaptic delays in artifact — AKD1500 has no delay processing |
+| [E0403](/errors/E0403) | `NonFiniteWeights` | NaN or Inf values in weight tensor — cannot quantize |
+| [E0404](/errors/E0404) | `WrongTarget` | Artifact compiled for a different target |
+| [E0407](/errors/E0407) | `TemporalInputNotSupported` | Input has T > 1 timesteps — AKD1500 requires T = 1 |

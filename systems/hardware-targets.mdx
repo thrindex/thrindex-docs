@@ -1,0 +1,145 @@
+---
+title: "Hardware Targets"
+description: "How to compile and deploy THRINDEX models to neuromorphic hardware. Currently supported: BrainChip AKD1500."
+---
+
+## Overview
+
+THRINDEX separates compilation from execution. A model is compiled once to a `.thx` artifact that carries the target it was built for. On a machine with the appropriate hardware and driver, the artifact is loaded and run by the corresponding backend.
+
+```
+Developer machine           Device (e.g. Raspberry Pi + AKD1500)
+──────────────────          ───────────────────────────────────────
+thx.compile(model,          akida-runtime model.fbz
+  "model.thx",                  ← reads JSON batch from stdin
+  target="akida-akd1500")       → writes JSON output to stdout
+        ↓
+akida_compile.py
+  model.thx → model.fbz
+```
+
+---
+
+## BrainChip AKD1500
+
+The `akida-akd1500` target maps THRINDEX models to BrainChip's [Akida 1.0](https://doc.brainchipinc.com/) neuromorphic processor.
+
+### Capability
+
+| Field | Value |
+|---|---|
+| Target name | `akida-akd1500` |
+| Native timestep | 1.0 ms |
+| Native delay support | None (`native_delay_max_steps = 0`) |
+| Delay fallback | Reject |
+| Precision | 4-bit integer per tensor |
+| Weight range | `[-7, 7]` (int8 container, 4-bit values) |
+
+### What the AKD1500 supports
+
+AKD1500 executes feedforward integer networks. Supported layer types:
+
+- **Dense** (`snn.Dense`) — fully connected, no delays
+- **Conv2d** (`snn.Conv2d`) — 2D convolution, no delays
+
+### What the AKD1500 rejects
+
+| Condition | Error |
+|---|---|
+| LIF layer in artifact | [E0401](/errors/E0401) |
+| Synaptic delays in artifact | [E0402](/errors/E0402) |
+| Non-finite (NaN / Inf) weights | [E0403](/errors/E0403) |
+| Artifact compiled for a different target | [E0404](/errors/E0404) |
+| Input with more than one timestep (`T > 1`) | [E0407](/errors/E0407) |
+
+AKD1500 is not an SNN backend. It does not implement leaky integrate-and-fire dynamics, temporal state, or spike-triggered reset. If your model uses LIF neurons, use `target="sim"` instead. See [E0401](/errors/E0401) for a full explanation.
+
+### Weight quantization
+
+Weights are quantized from `f32` to 4-bit signed integers during the Tier-1 compile step:
+
+```
+scale = max(|W|) / 7
+W_int = round(W / scale)  — clamped to [-7, 7]
+```
+
+The quantization error is at most `scale / 2` per weight. For models with large weight ranges, this error can be significant. Training with weight regularization that keeps `max(|W|)` small reduces quantization error.
+
+---
+
+## Deployment: two-tier setup
+
+AKD1500 deployment uses two separate machines:
+
+**Tier 1 — Developer machine** (Python + MetaTF)
+
+Requires: `thrindex` + `akida` Python package from BrainChip.
+
+```python
+import thrindex as thx
+
+# Compile to .thx — validates the model for akida-akd1500
+thx.compile(model, "model.thx", target="akida-akd1500")
+```
+
+Then convert to the BrainChip `.fbz` runtime format:
+
+```bash
+python akida_compile.py model.thx model.fbz
+```
+
+`akida_compile.py` is included in `crates/thrindex-backends/akida/python/` in the THRINDEX repository.
+
+**Tier 2 — Device** (Raspberry Pi + AKD1500 via M.2)
+
+Requires: THRINDEX built with `--features hardware` and the BrainChip Engine Library.
+
+```bash
+# Set path to Engine Library source (obtained from BrainChip)
+export THRINDEX_AKIDA_ENGINE_PATH=/path/to/engine/engine
+
+# Build the runtime binary
+cargo build -p thrindex-backend-akida --features hardware --release
+
+# Run inference
+echo '{"batch": [[[0.5, 0.2, 0.8, ...]]]}' | \
+  akida-runtime model.fbz --pcie-addr 0001:01:00.0
+```
+
+The runtime reads a JSON batch on stdin and writes a JSON result on stdout:
+
+```json
+// stdin — shape [N_samples, T=1, n_features]
+{"batch": [[[0.5, 0.2, 0.8, 0.1, ...]]]}
+
+// stdout on success — shape [N_samples, n_outputs]
+{"outputs": [[0.03, 0.91, 0.02, 0.04]]}
+
+// stdout on error
+{"error": "E0407: ..."}
+```
+
+### Environment variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `THRINDEX_AKIDA_ENGINE_PATH` | At build time | Path to the BrainChip Engine Library source drop |
+| `THRINDEX_AKIDA_DEVICE` | At runtime | PCIe address of the AKD1500 (default: `0001:01:00.0`) |
+
+### Getting the Engine Library
+
+The Engine Library is proprietary BrainChip software distributed to registered AKD1500 customers. It is not included in the THRINDEX repository. Contact [BrainChip](https://brainchipinc.com/) to obtain it.
+
+---
+
+## Conformance
+
+`akida-akd1500` is **permanently excluded** from the THRINDEX Certified [v0] conformance suite. The Certified badge measures spike-raster equivalence between a hardware backend and the reference simulator. AKD1500 does not implement SNN dynamics — it performs integer feedforward inference — and cannot produce a spike raster that is equivalent to the LIF simulator output.
+
+When the conformance harness runs, it prints:
+
+```
+EXCLUDED akida-akd1500: reason=non-snn-backend; metric=top-1-accuracy-frozen-brainchip-dataset
+```
+
+The alternative metric (top-1 accuracy on the frozen BrainChip dataset) is the appropriate correctness measure for AKD1500 inference. See [Conformance Overview](/conformance/overview) for details.

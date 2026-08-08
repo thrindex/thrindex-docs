@@ -1,0 +1,38 @@
+---
+title: "E0404 — WrongTarget"
+description: "The artifact was compiled for a different target backend and cannot be run on akida-akd1500 without recompilation."
+---
+
+<Warning>E0404: artifact was not compiled for akida-akd1500</Warning>
+
+## What happened
+
+A `.thx` artifact was submitted to the `akida-akd1500` backend, but its `metadata.target` field names a different target (for example `"sim"`). The backend rejects artifacts compiled for other targets.
+
+## Why
+
+A `.thx` artifact carries the target it was compiled for. The compiler resolves target-specific constants at compile time — for example, `alpha = exp(-dt / tau_mem)` uses the target's native `dt_ms`. Running an artifact compiled for one target on a different backend without recompilation may produce incorrect results even if both backends accept the same layer types.
+
+## How to fix
+
+Recompile the model for `akida-akd1500`:
+
+```python
+import thrindex as thx
+
+thx.compile(model, "model.thx", target="akida-akd1500")
+```
+
+Note that `akida-akd1500` rejects models containing [LIF layers](/errors/E0401) or [synaptic delays](/errors/E0402). If your model uses either, see those error pages for your options.
+
+## Example
+
+```
+E0404: .thx artifact was compiled for target="sim", not "akida-akd1500".
+Observed: metadata.target = "sim".
+Why: A .thx artifact carries the target it was compiled for. Running it on a
+     different backend without recompilation may produce incorrect results.
+What to do: Recompile with target="akida-akd1500":
+              thrindex build --target akida-akd1500 model.py
+Docs: https://docs.thrindex.com/errors/E0404
+```
