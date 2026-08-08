@@ -1,0 +1,160 @@
+---
+title: "Spike Encoding"
+description: "How to convert real-valued data into spike trains — the input representation problem in spiking neural networks."
+---
+
+## The input representation problem
+
+A conventional neural network takes a real-valued tensor as input. An SNN takes a spike raster — a binary matrix across time. Before any inference can happen, real-world data (images, audio, sensor readings) must be converted into spike trains.
+
+This conversion is **spike encoding**. The choice of encoding determines what information is preserved, what is discarded, and how many timesteps `T` are needed to represent the signal faithfully. It is one of the most consequential design decisions in an SNN pipeline.
+
+---
+
+## Rate encoding
+
+**The idea:** a neuron's firing rate encodes the signal magnitude. A feature with value 0.8 produces more spikes per second than one with value 0.2.
+
+**Mechanism:** at each timestep, generate a spike with probability equal to the normalized feature value.
+
+$$
+P(\text{spike at } t) = x_i \in [0, 1]
+$$
+
+Over `T` timesteps, the expected spike count for feature `i` is `T × x_i`. For large enough `T`, the spike count is a reliable estimate of the original value.
+
+```python
+import thrindex.encoders as enc
+import torch
+
+# x: a batch of real-valued inputs, values in [0, 1], shape [batch, features]
+x = torch.rand(32, 700)
+
+# Encode to a spike raster: [T, batch, features]
+g = torch.Generator()
+g.manual_seed(42)
+spikes = enc.rate(x, T=100, generator=g)
+# spikes[t, b, f] = 1 if feature f spiked at timestep t for sample b
+```
+
+**Properties:**
+
+| Property | Value |
+|---|---|
+| Output shape | `[T, batch, *]` |
+| Output range | Binary `{0, 1}` |
+| Information preserved | Magnitude only |
+| Minimum T for accuracy | ~50–200 for most tasks |
+| Noise | Poisson noise at each timestep |
+
+**When to use it:** classification tasks where the input is a real-valued feature vector (tabular data, audio spectrograms, processed images). The simplest and most robust encoding. Most published SNN benchmarks use rate coding.
+
+**Limitations:** requires many timesteps to accumulate a reliable rate estimate. Precise timing is lost — two inputs that produce the same rate are indistinguishable.
+
+---
+
+## Latency encoding
+
+**The idea:** the time of the first spike encodes the signal magnitude. A strong input produces an early spike; a weak input produces a late spike.
+
+$$
+t_{\text{spike}} \propto \frac{1}{x_i}
+$$
+
+A feature with value 1.0 produces a spike at `t=0`. A feature with value 0.1 produces a spike at `t = T-1`. Features with value 0 produce no spike.
+
+```python
+# x: shape [batch, features], values in [0, 1]
+spikes = enc.latency(x, T=50)
+# spikes[t, b, f] = 1 exactly once per feature, at the timestep corresponding to its value
+```
+
+**Properties:**
+
+| Property | Value |
+|---|---|
+| Output shape | `[T, batch, *]` |
+| Spikes per feature | Exactly 0 or 1 |
+| Information preserved | Magnitude + ordering |
+| Minimum T | Depends on resolution needed |
+| Noise | None (deterministic) |
+
+**When to use it:** applications where the relative ordering of inputs matters (stimulus contrast, competitive responses, sensory priority). Latency coding is theoretically more information-dense than rate coding — one spike can encode the full range of values — but harder to train because the loss gradient must flow through spike times, not spike counts.
+
+**Note:** THRINDEX trains with rate loss (spike counts), which does not directly exploit latency information. Latency-encoded inputs can still be trained with rate loss, but you may need longer `T` for the count to reflect the encoded information.
+
+---
+
+## Delta encoding
+
+**The idea:** emit a spike when the signal changes by more than a threshold `Δ`. Constant inputs produce no spikes; rapidly changing inputs produce many.
+
+```python
+# x: shape [T, batch, features] — a temporal signal already unrolled over time
+spikes = enc.delta(x, T=100, threshold=0.1)
+```
+
+**Properties:**
+
+| Property | Value |
+|---|---|
+| Input | Temporal signal `[T, batch, *]` |
+| Output shape | `[T, batch, *]` |
+| Spikes when | `|x[t] - x[t-1]| > threshold` |
+| Information preserved | Changes, not absolute values |
+| Sparsity | High on slow/constant signals |
+
+**When to use it:** time-series data where the relevant information is in the dynamics, not the absolute values. Audio waveforms, inertial sensors, control signals. Delta encoding is the natural analog of an event camera's operating principle (see below).
+
+---
+
+## Event cameras: natural spikes
+
+Event cameras are hardware sensors that natively produce spike-like output. Rather than capturing frames at a fixed rate, each pixel fires an event when its log-intensity changes by more than a threshold:
+
+$$
+\text{event at pixel } (u, v, t) \text{ if } \log I(u, v, t) - \log I(u, v, t_{\text{last}}) > \theta
+$$
+
+Events carry a timestamp, a pixel location, and a polarity (positive or negative change). An event stream is structurally identical to a spike raster with a 2D spatial topology.
+
+This is why SNNs and neuromorphic hardware are a natural fit for event-camera data: the input is already sparse, binary, and temporal. No encoding step is needed — the sensor does it.
+
+---
+
+## Encoding choice and accuracy
+
+The right encoding depends on the data and the task. There is no universal answer.
+
+| Encoding | Good for | Typical T |
+|---|---|---|
+| Rate | Feature vectors, spectrograms, images | 50–200 |
+| Latency | Sensory contrast, competitive decisions | 20–50 |
+| Delta | Temporal signals, sensors, audio | Matches signal length |
+| Event camera | Pixel-level events | Matches event stream |
+
+For most published benchmarks (MNIST, SHD, N-MNIST), rate encoding with T=100 is the standard starting point. For edge sensor applications, delta or event encoding often produces sparser rasters and lower energy.
+
+---
+
+## Decoding: reading the output
+
+The same question applies to the output. THRINDEX uses **rate decoding** by default: the prediction is the class with the highest total spike count across all `T` timesteps.
+
+```python
+from thrindex.train import rate_loss
+
+spikes = model(encoded_input)          # [T, batch, n_classes]
+loss = rate_loss(spikes, labels)       # cross-entropy on spike count sums
+```
+
+The `rate_loss` function sums `spikes` over the time dimension before applying cross-entropy. This is the standard approach and the one used in all THRINDEX tutorials and benchmarks.
+
+<CardGroup cols={2}>
+  <Card title="Time in SNNs" href="/learn/time-in-snn">
+    How T, dt, and the spike raster relate — and why they matter for hardware.
+  </Card>
+  <Card title="Population Coding" href="/learn/population-coding">
+    How groups of neurons collectively represent information beyond a single spike count.
+  </Card>
+</CardGroup>

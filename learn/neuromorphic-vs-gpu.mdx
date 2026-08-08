@@ -1,0 +1,118 @@
+---
+title: "Neuromorphic vs. GPU: An Engineering Comparison"
+description: "A concrete, honest comparison of neuromorphic processors and GPUs — when each wins, by how much, and why."
+---
+
+## Two different computational models
+
+A GPU and a neuromorphic processor are not competitors for the same workload. They are optimized for fundamentally different computational patterns.
+
+A GPU is a **synchronous, dense, clocked** processor. Every cycle, it applies the same operation to thousands of values in parallel. Its peak efficiency is a fully dense matrix multiplication: GEMM. Every neuron contributes a value on every forward pass.
+
+A neuromorphic processor is **event-driven and sparse**. Computation happens only when a spike occurs. A synapse consumes energy only when its pre-synaptic neuron fires. If no neuron fires, no energy is spent. Its peak efficiency is a fully sparse spike raster: no spikes, no cost.
+
+The gap between these models determines when each wins.
+
+---
+
+## The energy comparison
+
+From the [energy model](/learn/energy-model):
+
+```
+GPU energy   ≈ total_weights × MAC_cost
+SNN energy   ≈ total_weights × firing_rate × syn-op_cost
+```
+
+For typical modern hardware:
+
+| Operation | Energy |
+|---|---|
+| GPU MAC (FP32, 7 nm) | ~0.1–0.5 pJ |
+| GPU MAC (FP16, 7 nm) | ~0.05–0.2 pJ |
+| Neuromorphic syn-op (Loihi 2, 7 nm) | ~1–3 pJ |
+| Neuromorphic syn-op (AKD1500, 28 nm) | ~10–50 pJ (estimated) |
+
+A syn-op is more expensive than a GPU MAC at the same process node. The neuromorphic advantage comes entirely from **sparsity**.
+
+At 1% firing rate, an SNN does 1% of the syn-ops a dense network does. At 1–3 pJ/syn-op vs 0.2 pJ/MAC:
+
+```
+Energy ratio = firing_rate × (syn-op_cost / MAC_cost)
+             = 0.01 × (2 / 0.2)
+             = 0.10
+```
+
+10× energy advantage at 1% firing rate. At 5% firing rate:
+
+```
+= 0.05 × (2 / 0.2) = 0.5
+```
+
+2× advantage at 5%. At 10% firing rate: parity. At 20%: the GPU wins.
+
+**The neuromorphic energy advantage is real, but it is conditional on achieving low firing rates.** A poorly designed SNN with 20% firing rates is less efficient than a GPU running a quantized ANN.
+
+---
+
+## The latency comparison
+
+For real-time edge inference, latency — not energy — is often the binding constraint.
+
+A GPU inference pass over a ResNet-50 takes ~5 ms on a V100. An SNN over a simple Dense-LIF stack with T=100 takes roughly `T × layer_time` — and on a neuromorphic chip, each timestep is processed in parallel at the hardware's clock rate.
+
+Neuromorphic chips process spikes asynchronously as they arrive. A spike at timestep `t` triggers computation in downstream neurons immediately, not after waiting for all timesteps to complete. This is latency-to-first-spike: the network can produce a prediction after the first informative spike, potentially at `t < T`.
+
+**Neuromorphic latency advantage:** tasks where the latency budget is in the sub-millisecond range and the answer can be derived from early spikes (temporal coding, event-camera tracking). For tasks requiring `T=100` timesteps of rate integration, latency is comparable to a CPU inference pass.
+
+---
+
+## The throughput comparison
+
+GPUs have massive throughput on dense batch inference. A datacenter GPU processes thousands of images per second. A neuromorphic chip like Loihi 2 or AKD1500 processes one sample (or a small batch) per inference call.
+
+**GPU wins on throughput.** Neuromorphic hardware is not designed for batch datacenter inference. It is designed for on-device, real-time, low-power inference at the edge.
+
+---
+
+## When neuromorphic wins
+
+| Condition | Why neuromorphic wins |
+|---|---|
+| Firing rate < 5% | Energy scales with sparsity; GPU does not |
+| On-device, no cloud | No data movement, no network cost |
+| Always-on sensing | Idle power is near zero when silent |
+| Event-camera input | Natural spike-based input, no encoding overhead |
+| Battery-powered device | mW vs W-class power budget |
+| Temporal/sequential data | Intrinsic state tracking without recurrent overhead |
+
+## When GPU wins
+
+| Condition | Why GPU wins |
+|---|---|
+| Firing rate > 15–20% | Sparsity advantage lost, syn-op cost dominates |
+| Batch inference | GPU throughput vastly higher |
+| High-accuracy demands | ANN ecosystems, pre-trained models, fine-tuning |
+| Training | Gradient computation on GPUs is orders of magnitude faster |
+| General-purpose workload | GPUs run arbitrary code; neuromorphic does not |
+
+---
+
+## The honest summary
+
+Neuromorphic hardware does not replace GPUs. It addresses a specific operating point: **always-on, low-power, edge inference on sparse temporal data with latency constraints that rule out cloud offload**.
+
+The use cases where this combination matters: robotics (event-driven sensors, real-time control), drones (mW power budget, onboard inference), hearing aids and cochlear implants, wearable health monitoring, space systems.
+
+The use cases where it does not: image classification at scale, language models, training workloads, anything that runs in a datacenter.
+
+The engineering decision is: does your application operate at a firing rate below 5–10%, on-device, with a power budget below 1 W? If yes, neuromorphic is worth evaluating. If not, a quantized model on a modern microcontroller or an NPU is likely the better choice.
+
+<CardGroup cols={2}>
+  <Card title="The Energy Model" href="/learn/energy-model">
+    The syn-ops formula, the coefficient, and how to calibrate it for a specific chip.
+  </Card>
+  <Card title="The Neuromorphic Landscape" href="/learn/neuromorphic-landscape">
+    Survey of production neuromorphic chips, their capabilities, and tradeoffs.
+  </Card>
+</CardGroup>

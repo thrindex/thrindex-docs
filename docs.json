@@ -139,14 +139,35 @@
         "tab": "Learn",
         "groups": [
           {
-            "group": "Spiking Neural Networks",
+            "group": "Foundations",
             "pages": [
               "learn/spiking-neural-networks",
               "learn/leaky-integrate-and-fire",
-              "learn/surrogate-gradients",
               "learn/time-in-snn",
+              "learn/spike-encoding",
+              "learn/population-coding"
+            ]
+          },
+          {
+            "group": "Training",
+            "pages": [
+              "learn/surrogate-gradients",
+              "learn/training-stability"
+            ]
+          },
+          {
+            "group": "Hardware",
+            "pages": [
               "learn/neuromorphic-hardware",
+              "learn/neuromorphic-landscape",
+              "learn/neuromorphic-vs-gpu",
               "learn/energy-model"
+            ]
+          },
+          {
+            "group": "Neuroscience",
+            "pages": [
+              "learn/plasticity-and-stdp"
             ]
           }
         ]

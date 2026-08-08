@@ -1,0 +1,107 @@
+---
+title: "Population Coding"
+description: "How groups of neurons collectively represent information — the distributed representation principle in spiking neural networks."
+---
+
+## A single neuron carries little
+
+A single LIF neuron produces a binary output at each timestep: 1 (spike) or 0 (silence). Over `T = 100` timesteps, it can generate at most 100 spikes. If that count is the only output, the neuron can encode a value somewhere between 0 and 100 — a coarse, noisy estimate.
+
+A **population** of neurons encodes the same information more precisely, more robustly, and with richer structure. This is the principle behind population coding: information is distributed across many neurons, not concentrated in one.
+
+---
+
+## The distributed representation
+
+In THRINDEX, a Dense → LIF block produces a spike raster of shape `[T, n_neurons]`. The prediction is the argmax of the column sums — the neuron with the most spikes wins.
+
+But the internal representations, layer by layer, are richer. Consider a layer with 512 neurons encoding a 20-class classification problem. At any given timestep, perhaps 50 neurons fire (10% firing rate). The pattern of which 50 neurons fire is the representation — not the identity of any single one.
+
+This is a **sparse distributed representation**: many neurons are available to contribute, but only a few are active at once. The combination of which neurons fired, and when, encodes more information than any individual neuron could.
+
+---
+
+## Why distribution matters: robustness
+
+If a single neuron encoded a feature and that neuron failed (noise, damage, quantization error), the information is lost. In a distributed representation, any single neuron carries a small fraction of the total information. The representation degrades gracefully as neurons are lost or corrupted.
+
+This is directly relevant to neuromorphic hardware. Fixed-point quantization (4-bit or 8-bit weights), thermal noise, and process variation all introduce errors at the neuron level. Population coding absorbs these errors — a classifier using 512 neurons is far more robust to individual neuron noise than one using 20.
+
+---
+
+## Rate coding as population averaging
+
+The standard rate-coded prediction in THRINDEX is a specific form of population decoding: sum each neuron's spikes over `T`, then take the argmax.
+
+$$
+\hat{y} = \arg\max_c \sum_{t=0}^{T-1} s_{t,c}
+$$
+
+This is a **winner-take-all** decision rule applied to population activity. The winning class is the one whose output neuron population produced the most spikes.
+
+For a well-trained network, each output neuron specializes in one class. The population of 20 output neurons (one per class) collectively agrees on the prediction by voting with spikes.
+
+---
+
+## Softmax on spike counts
+
+A soft version of the same idea: normalize the spike counts to form a probability distribution.
+
+$$
+P(c) = \frac{\exp(\text{count}_c / T)}{\sum_{c'} \exp(\text{count}_{c'} / T)}
+$$
+
+This is equivalent to applying softmax to the mean firing rate of each output neuron. The `rate_loss` function in THRINDEX computes cross-entropy on these normalized counts:
+
+```python
+from thrindex.train import rate_loss
+
+spikes = model(x)              # [T, batch, n_classes]
+loss = rate_loss(spikes, y)    # cross-entropy on spike count / T
+```
+
+The gradient of this loss pushes the correct class neuron to fire more and the wrong-class neurons to fire less — a direct pressure on the population activity pattern.
+
+---
+
+## Internal representations: what hidden layers encode
+
+Output neurons encode class identity. What do hidden neurons encode?
+
+In a trained Dense → LIF network, hidden neurons learn to be selective detectors: each neuron responds strongly to a specific pattern in its input and is silent otherwise. This selectivity emerges from training — it is not designed. The sparsity of the LIF response (most neurons silent at any given moment) forces the network to use distributed, non-redundant representations.
+
+This is directly analogous to what neuroscience observes in the visual cortex: cells that respond specifically to oriented edges, spatial frequencies, or faces, while remaining silent for other stimuli.
+
+---
+
+## Sparsity as a design goal
+
+In SNNs, sparsity is both a measure of efficiency and a property of the representation. A model where every neuron fires on every timestep for every input is:
+
+1. **Energetically expensive:** every synapse is active, yielding maximum syn-ops.
+2. **Representationally poor:** if all neurons fire regardless of input, the population carries no input-specific information.
+
+A well-regularized SNN converges to sparse, input-selective firing. The [energy model](/learn/energy-model) directly rewards sparsity: `energy = syn-ops × coefficient`, and syn-ops is proportional to firing rate.
+
+Designing models with sparsity in mind — appropriate threshold, `tau_mem`, and weight regularization — is not just good for energy; it produces better-organized internal representations.
+
+---
+
+## Place cells and grid cells: the biological analog
+
+The biological inspiration for population coding comes from spatial navigation. Hippocampal **place cells** fire when an animal is in a specific location — each cell has a "place field." The animal's position is encoded not by one cell, but by the overlapping firing fields of hundreds of cells. The animal's position can be decoded by reading which cells are active.
+
+**Grid cells** (entorhinal cortex) encode position in a hexagonal periodic pattern — a completely different representational geometry. Both are population codes.
+
+The key insight from neuroscience: the brain does not store information as a single neuron being "on" or "off." It stores information as a pattern across a population. THRINDEX's distributed tensor representations are a computational echo of this principle.
+
+---
+
+<CardGroup cols={2}>
+  <Card title="Spike Encoding" href="/learn/spike-encoding">
+    How real-valued inputs become spike trains before reaching the population.
+  </Card>
+  <Card title="The LIF Neuron" href="/learn/leaky-integrate-and-fire">
+    The single-neuron model that population coding is built from.
+  </Card>
+</CardGroup>

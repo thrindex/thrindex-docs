@@ -1,0 +1,167 @@
+---
+title: "Training SNNs: Stability and Practical Tuning"
+description: "What goes wrong when training spiking neural networks, why it goes wrong, and the concrete interventions that fix it."
+---
+
+## Why SNN training fails differently
+
+A conventional neural network trained with Adam on a well-scaled dataset usually converges within a few hours with default hyperparameters. An SNN trained the same way often produces one of three failure modes: silent networks, saturated networks, or oscillating loss.
+
+The root cause is the interaction between the discrete spike function, the surrogate gradient, and the membrane dynamics. Understanding each failure mode makes the solution obvious.
+
+---
+
+## Failure mode 1: the silent network
+
+**Symptoms:** loss does not decrease, accuracy stays at chance, the transcript shows zero or near-zero spike counts.
+
+**Cause:** neurons never reach their threshold. If the initial weights are too small, the input current `I[t] = Wx[t]` is too weak to push the membrane past `threshold`. The surrogate gradient exists only near the threshold — if the membrane never approaches it, gradients are zero and weights do not update.
+
+**Fix:**
+
+1. **Lower the threshold.** Start with `threshold = 0.3` for inputs in `[0, 1]`. A threshold of `1.0` with rate-encoded inputs typically produces a silent network on the first epoch.
+
+2. **Scale the weight initialization.** The default Kaiming initialization is designed for ReLU networks where the activation is unbounded. For LIF neurons, you may need larger initial weights. A practical approach: initialize weights from `N(0, 1/√in_features)` instead of the Kaiming default, and scale up by a factor of 2–3 if neurons remain silent.
+
+3. **Check the input scale.** Rate-encoded inputs in `[0, 1]` are weak. After the first Dense layer with 512 outputs, each neuron receives the sum of ~700 inputs, each roughly 0.3 (average firing rate). The expected membrane input is `0.3 × √700 ≈ 8` with Kaiming weights — which should cross a threshold of 0.3 easily. If it does not, the encoder is producing near-zero spikes.
+
+---
+
+## Failure mode 2: the saturated network
+
+**Symptoms:** loss saturates at a high value, transcript shows high spike rates (>50%), all output neurons fire for every class.
+
+**Cause:** neurons fire on nearly every timestep. When all neurons fire constantly, no information is propagated — a network that fires everywhere is equivalent to a dense ANN without any of the sparsity benefits, and the classification signal is drowned in noise.
+
+**Fix:**
+
+1. **Raise the threshold.** Increase `threshold` until the average spike rate falls to 5–20%.
+
+2. **Add a firing-rate penalty.** Penalize high spike rates during training:
+
+   ```python
+   # Target average firing rate of 5%
+   target_rate = 0.05
+   spikes = model(x)              # [T, batch, features]
+   rate = spikes.mean()           # scalar average firing rate
+   reg_loss = (rate - target_rate) ** 2
+   loss = rate_loss(spikes, y) + 0.1 * reg_loss
+   ```
+
+3. **Reduce the initial weight scale.** Smaller weights → smaller input currents → fewer spikes.
+
+---
+
+## Failure mode 3: oscillating loss
+
+**Symptoms:** loss decreases for a few epochs, then increases, then oscillates without converging.
+
+**Cause:** the loss gradient is an approximation (the surrogate). Across many timesteps and layers, approximation errors accumulate. A learning rate that is too high amplifies these errors into oscillation.
+
+**Fix:**
+
+1. **Clip gradients.** This is the single most reliable intervention for unstable SNN training:
+
+   ```python
+   loss.backward()
+   torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
+   optimizer.step()
+   ```
+
+2. **Lower the learning rate.** `1e-3` is a reasonable starting point; reduce to `3e-4` or `1e-4` if oscillation persists.
+
+3. **Use a learning rate schedule.** A cosine annealing schedule reduces the learning rate gradually, which reduces the impact of surrogate noise late in training:
+
+   ```python
+   scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+       optimizer, T_max=n_epochs
+   )
+   ```
+
+---
+
+## Threshold balancing
+
+The threshold is the most important hyperparameter in an SNN. Unlike ANN hyperparameters, it interacts with the data scale, the weight initialization, and the time constant in a non-obvious way.
+
+A practical calibration procedure:
+
+1. **Run one batch forward** with no gradient computation.
+2. **Measure the average spike rate** per layer.
+3. **Adjust thresholds** so each layer has a firing rate between 5% and 20%.
+4. **Repeat** until all layers are in range, then begin training.
+
+```python
+model.eval()
+with torch.no_grad():
+    spikes_per_layer = {}
+    x = next(iter(dataloader))[0]
+    encoded = enc.rate(x, T=100, generator=torch.Generator().manual_seed(0))
+    # Register hooks to capture intermediate activations
+    # ... then measure mean spike rates
+```
+
+Doing this before the first training epoch avoids wasting epochs on a miscalibrated network.
+
+---
+
+## The dead neuron problem
+
+A neuron that never reaches its threshold in the training set will never receive a gradient and will remain silent forever — the "dead neuron" problem, analogous to dying ReLUs but more severe because the threshold is fixed, not learned.
+
+Detection: after a few epochs, measure per-neuron spike rates across the training set. Any neuron with a rate of exactly zero is dead.
+
+Recovery: there is no reliable automatic recovery. Prevention is the better approach: initialize thresholds low, verify firing rates before training, and use the firing-rate regularization described above.
+
+---
+
+## Checklist: before the first training run
+
+| Check | Command / code |
+|---|---|
+| Threshold produces spikes | `model(encoded_batch).mean()` — should be 0.05–0.20 |
+| Gradient norm is bounded | Print `clip_grad_norm_` return value |
+| Learning rate | Start at 1e-3; lower if oscillation |
+| Input scale | Verify encoded inputs are in [0, 1] |
+| T is sufficient | For rate coding: T ≥ 50 for reliable counts |
+
+---
+
+## Reference training configuration
+
+This configuration works as a starting point for most rate-coded classification tasks:
+
+```python
+model = snn.Sequential(
+    snn.Dense(in_features, 512),
+    snn.LIF(tau_mem=20.0, threshold=0.3),
+    snn.Dense(512, n_classes),
+    snn.LIF(tau_mem=20.0, threshold=0.3),
+)
+
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=50)
+
+for x, y in dataloader:
+    encoded = enc.rate(x, T=100, generator=g)       # [T=100, batch, in_features]
+    spikes = model(encoded)                          # [T=100, batch, n_classes]
+
+    loss = rate_loss(spikes, y)
+    loss.backward()
+    torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
+    optimizer.step()
+    optimizer.zero_grad()
+
+scheduler.step()
+```
+
+This is the configuration used in the THRINDEX keyword-spotting tutorial, which reaches 64.66% on the Spiking Heidelberg Digits benchmark.
+
+<CardGroup cols={2}>
+  <Card title="Surrogate Gradients" href="/learn/surrogate-gradients">
+    Why the spike function needs a surrogate and how the fast-sigmoid works.
+  </Card>
+  <Card title="Keyword Spotting Tutorial" href="/tutorials/keyword-spotting">
+    A complete training pipeline on the SHD dataset using the configuration above.
+  </Card>
+</CardGroup>

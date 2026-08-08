@@ -1,0 +1,107 @@
+---
+title: "Plasticity and STDP"
+description: "The biological learning rules that inspired neuromorphic computing — spike-timing-dependent plasticity, Hebbian learning, and why gradient descent is the practical choice."
+---
+
+## How biological synapses learn
+
+In the brain, learning is primarily synaptic: the strength of the connection between two neurons changes based on their activity. The dominant theory, formalized by Donald Hebb in 1949, is:
+
+> *"Neurons that fire together, wire together."*
+
+If neuron A reliably fires before neuron B, and B fires shortly after, the synapse from A to B is strengthened. If B fires before A, or if they fire independently, the connection weakens. This is **Hebbian learning**: correlation-based weight updates that do not require a global error signal.
+
+---
+
+## Spike-timing-dependent plasticity (STDP)
+
+In 1998, experimental recordings from cortical neurons revealed a precise version of Hebbian learning: the direction and magnitude of synaptic change depend on the **relative timing** of pre- and post-synaptic spikes. This mechanism is called spike-timing-dependent plasticity (STDP).
+
+The STDP rule:
+
+$$
+\Delta w = \begin{cases}
+A_+ \cdot e^{-\Delta t / \tau_+} & \text{if } \Delta t > 0 \text{ (pre before post)} \\
+-A_- \cdot e^{|\Delta t| / \tau_-} & \text{if } \Delta t < 0 \text{ (post before pre)}
+\end{cases}
+$$
+
+where:
+- `Δt = t_post − t_pre` is the timing difference
+- `A+` and `A−` are the amplitudes of potentiation and depression
+- `τ+` and `τ−` are the time windows (typically 20–40 ms)
+
+**Potentiation (LTP):** if the pre-synaptic neuron fires just before the post-synaptic neuron, the synapse is strengthened. The pre-synaptic neuron "predicted" the post-synaptic firing.
+
+**Depression (LTD):** if the post-synaptic neuron fires just before (or without) the pre-synaptic neuron, the synapse is weakened. The connection was not predictive.
+
+The result is a causal learning rule: synapses that helped cause a spike are strengthened; those that did not are weakened.
+
+---
+
+## Why STDP is compelling
+
+**No global error signal.** STDP is a local rule: each synapse updates based only on the activity of its two adjacent neurons, not on the network's output error. This is biologically plausible — neurons have no access to the global loss landscape.
+
+**Unsupervised.** STDP does not require labeled data. It extracts structure from the statistics of the input — neurons that consistently co-activate become strongly connected, forming representations of common patterns.
+
+**Online.** STDP updates happen in real time as spikes arrive. There is no batch gradient accumulation, no forward-backward pass, and no stored activations. This makes it compatible with continuous, streaming data.
+
+**Energy-efficient learning.** Because updates are local and event-driven, STDP can in principle be implemented on-chip with very low power. Some neuromorphic chips (notably Intel Loihi 2) implement STDP or variants of it directly in hardware.
+
+---
+
+## The limitations of STDP
+
+**It cannot solve hard supervised problems.** STDP is a correlation rule. On its own, it cannot minimize an arbitrary loss function or achieve competitive classification accuracy on benchmarks like ImageNet. The weights it produces are not trained toward any specific output — they reflect input correlations, not task objectives.
+
+**Credit assignment is unsolved.** How does STDP update a synapse deep in a network based on a reward signal that arrives milliseconds later? This is the temporal credit assignment problem. Various extensions (reward-modulated STDP, eligibility traces) address it partially, but none achieve the accuracy of gradient descent on standard tasks.
+
+**Sensitive to hyperparameters.** `A+`, `A-`, `τ+`, `τ-`, and the initial weight distribution interact in complex ways. Small changes can lead to weight collapse (all weights to zero) or weight explosion (all weights to maximum).
+
+---
+
+## STDP vs. surrogate gradient descent
+
+This is the central practical question: for a given task, which learning rule should you use?
+
+| Dimension | STDP | Surrogate gradient descent |
+|---|---|---|
+| Requires labeled data | No | Yes |
+| Achieves competitive accuracy | Rarely | Yes (on most tasks) |
+| On-chip hardware support | Loihi 2, some others | Not directly (needs backprop infrastructure) |
+| Online / streaming | Yes | Limited (requires episode boundaries) |
+| Global error signal | Not required | Required |
+| Biological plausibility | High | Low |
+| Practical for production | Rarely | Yes |
+
+For any supervised classification or regression task, surrogate gradient descent with backpropagation through time (BPTT) is the correct choice. It achieves competitive accuracy, benefits from the entire deep learning ecosystem, and trains in hours rather than days.
+
+STDP remains the better choice for: unsupervised feature learning as a pre-training step, online adaptation without labeled data, and research into biologically plausible learning mechanisms.
+
+---
+
+## STDP in THRINDEX
+
+THRINDEX currently trains with surrogate gradient descent. STDP is not implemented as a training mode.
+
+The design decision: THRINDEX targets production deployment — compiling a trained model to a `.thx` artifact and running it on hardware. The training step that precedes compilation is intended to be as reliable as possible, which means gradient-based training on a standard PyTorch loop.
+
+If STDP-based pre-training or online adaptation become practical for production use cases, this is a natural extension of the compile pipeline. The architecture of the `Backend` trait and the `.thx` artifact format does not preclude it.
+
+---
+
+## Further reading
+
+- Bi, G., & Poo, M. (1998). [Synaptic modifications in cultured hippocampal neurons](https://www.jneurosci.org/content/18/24/10464). *Journal of Neuroscience.* The original STDP paper.
+- Song, S., Miller, K. D., & Abbott, L. F. (2000). [Competitive Hebbian learning through spike-timing-dependent synaptic plasticity](https://www.nature.com/articles/nn0900_919). *Nature Neuroscience.*
+- Maass, W. (1997). [Networks of spiking neurons: the third generation of neural network models](https://www.sciencedirect.com/science/article/pii/S0893608097000117). *Neural Networks.* The foundational theory paper on SNNs.
+
+<CardGroup cols={2}>
+  <Card title="Surrogate Gradients" href="/learn/surrogate-gradients">
+    How THRINDEX trains SNNs with gradient descent through the non-differentiable spike.
+  </Card>
+  <Card title="Spiking Neural Networks" href="/learn/spiking-neural-networks">
+    The core concepts behind SNNs and how they differ from conventional networks.
+  </Card>
+</CardGroup>

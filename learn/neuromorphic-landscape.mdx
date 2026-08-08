@@ -1,0 +1,130 @@
+---
+title: "The Neuromorphic Landscape"
+description: "A neutral technical survey of production and research neuromorphic processors — what each does, what it does not, and where the field is heading."
+---
+
+## Overview
+
+Neuromorphic hardware is not a single chip or architecture. It is a category of processors that share one defining property: they implement event-driven, spike-based computation directly in silicon rather than in software running on a general-purpose core.
+
+The field spans academic research systems and production silicon, analog and digital designs, and a wide range of application targets. This page surveys the major production systems as of 2026 and the design dimensions that differentiate them.
+
+---
+
+## Intel Loihi 2
+
+**Type:** Digital synchronous, multi-core  
+**Process:** 4 nm Intel 4  
+**Neurons per chip:** ~1 million programmable neurons  
+**Cores:** 128 neuromorphic cores + 6 Lakemont x86 cores  
+**Connectivity:** Mesh interconnect with spike routing  
+**Precision:** Configurable (1–32 bit synaptic weights)  
+**Power:** ~1 W (chip), sub-mW per core at low activity  
+**Access:** Research via Intel's neuromorphic research community program
+
+Loihi 2 is the most programmable of the major neuromorphic chips. Its neuron model is configurable: you can implement LIF, adaptive LIF, synaptic dynamics, and custom learning rules through a small instruction set that runs on each core. Spike routing is handled by an on-chip network that can represent arbitrary graph topologies.
+
+**Notable:** Loihi 2 supports on-chip learning (STDP and custom rules), not just inference. This makes it useful for continual learning and online adaptation research that other chips cannot support.
+
+**Practical notes:** not commercially available at volume. Access is through Intel's neuromorphic research cloud (Intel's neuromorphic research community, INRC) or via a development kit for partners. Software toolchain is `lava-nc` (Python).
+
+---
+
+## BrainChip AKD1500
+
+**Type:** Digital synchronous, single-chip  
+**Process:** 28 nm  
+**Neurons per chip:** Up to 1.2 million neurons (Akida 1.0)  
+**Interface:** PCIe (M.2 HAT for Raspberry Pi), SPI  
+**Precision:** 4-bit weights, 4-bit activations (Akida 1.0)  
+**Power:** ~300 mW peak, <1 mW idle  
+**Access:** Commercially available (MetaTF developer kit, M.2 HAT)
+
+AKD1500 runs Akida 1.0, which is an integer feedforward architecture: Dense and Conv2d layers with bounded ReLU activation. It does **not** implement LIF neurons or temporal membrane dynamics. The chip performs spatial inference — one frame per forward call — not temporal SNN inference.
+
+**Important distinction from other neuromorphic chips:** AKD1500 is not an SNN processor in the strict sense. It is a low-power integer inference accelerator inspired by neuromorphic design principles. This is why it is [excluded from the THRINDEX Certified conformance suite](/conformance/adding-a-backend) — the spike-raster equivalence metric does not apply.
+
+**When to use it:** low-power edge inference on sensor data, keyword spotting, image classification at the edge. Best suited for models trained with conventional quantization-aware training, not models with LIF temporal dynamics.
+
+---
+
+## IBM TrueNorth
+
+**Type:** Digital synchronous, massively parallel  
+**Process:** 28 nm Samsung  
+**Neurons per chip:** 1 million neurons, 256 million synapses  
+**Cores:** 4096 neurosynaptic cores  
+**Precision:** 1-bit spikes, configurable weight precision  
+**Power:** ~70 mW at 1 kHz operation  
+**Access:** Research and government programs; not commercially available
+
+TrueNorth was the first large-scale neuromorphic chip to demonstrate energy efficiency at the 10^6 neuron scale. Its architecture is extremely regular: each of the 4096 cores has exactly 256 neurons and 256 inputs. This regularity enabled efficient silicon layout but also constrains what models can be mapped.
+
+**Historical context:** TrueNorth demonstrated in 2014 that neuromorphic inference at scale was feasible. It is largely superseded by Loihi 2 in capability, but remains the most-cited reference in neuromorphic energy benchmarks.
+
+---
+
+## SpiNNaker 2
+
+**Type:** Digital, many-core ARM-based  
+**Process:** 22 nm GlobalFoundries  
+**Processing elements:** 152 ARM Cortex-M4F cores per chip  
+**Neurons per chip:** ~10,000–100,000 (software-defined, flexible)  
+**Power:** ~4–10 W  
+**Access:** Research via the Human Brain Project; University of Manchester
+
+SpiNNaker 2 takes a different approach from the other chips on this list. Rather than implementing fixed neuron circuits in hardware, it runs neuron simulation software on a grid of small ARM cores. This makes it extremely flexible: any neuron model that can be expressed in C can run on SpiNNaker 2.
+
+The tradeoff: higher power and lower energy efficiency per neuron compared to dedicated silicon like Loihi 2. SpiNNaker 2's strength is flexibility and scalability — multiple chips can be connected to simulate billions of neurons for large-scale brain simulation.
+
+**Primary use case:** scientific brain simulation and neuroscience research rather than edge inference.
+
+---
+
+## BrainScaleS 2
+
+**Type:** Mixed-signal analog/digital  
+**Scale:** 512 adaptive exponential LIF neurons per chip  
+**Speed:** Up to 1000× biological real-time (accelerated simulation)  
+**Access:** Research via the Human Brain Project; Heidelberg University
+
+BrainScaleS is fundamentally different from all digital chips: membrane potential is a **physical voltage on a capacitor**. Synaptic input is a physical current. Integration is done by analog electronics, not software or digital logic. The chip runs at 1000× biological speed because analog circuits do not need to wait for a clock cycle.
+
+**Why this matters:** BrainScaleS can simulate a LIF network in microseconds. For neuroscience experiments that need many simulation runs (parameter sweeps, evolutionary algorithms), this speed is a major advantage over digital chips and software simulators.
+
+**Challenges:** analog circuits are sensitive to temperature and process variation. Every neuron behaves slightly differently from the ideal model. Calibration — mapping the intended model parameters to physical hardware settings — is an active research problem. BrainScaleS is a research tool, not an inference accelerator.
+
+---
+
+## Comparison table
+
+| System | Type | Neurons | Precision | Power | LIF dynamics | Commercial |
+|---|---|---|---|---|---|---|
+| Intel Loihi 2 | Digital | ~1M | 1–32 bit | ~1 W | Yes | No (research) |
+| BrainChip AKD1500 | Digital | ~1.2M | 4-bit | ~300 mW | No (ReLU) | Yes |
+| IBM TrueNorth | Digital | 1M | 1-bit spikes | ~70 mW | Fixed | No |
+| SpiNNaker 2 | ARM cores | Flexible | Software | ~4–10 W | Any | No (research) |
+| BrainScaleS 2 | Analog | 512/chip | Analog | mW/chip | Yes (physical) | No (research) |
+
+---
+
+## Where the field is heading
+
+Several trends are converging:
+
+**Akida 2.0 (BrainChip):** The next generation adds configurable activations (LUT-based), temporal neural processors for delay support, and larger models. This would bring BrainChip hardware closer to LIF-style dynamics and potentially into scope for THRINDEX Certified conformance.
+
+**On-chip learning:** Loihi 2 supports it; most others do not. The combination of low-power inference and on-device weight updates enables adaptive models that change their behavior in the field without sending data to a cloud.
+
+**Photonic neuromorphics:** Research systems using optical waveguides for spike propagation are reaching the prototype stage. Communication at the speed of light with near-zero energy per spike — relevant for very large networks where data movement dominates energy.
+
+**Integration with conventional silicon:** Chips like Intel's Meteor Lake include a dedicated NPU on the same die as CPU and GPU. Neuromorphic processing may follow a similar integration path — not a standalone chip, but a core type within a heterogeneous processor.
+
+<CardGroup cols={2}>
+  <Card title="Neuromorphic Hardware" href="/learn/neuromorphic-hardware">
+    How THRINDEX maps to neuromorphic chips via the Capability descriptor.
+  </Card>
+  <Card title="Neuromorphic vs. GPU" href="/learn/neuromorphic-vs-gpu">
+    When neuromorphic wins on energy and latency, with concrete numbers.
+  </Card>
+</CardGroup>
