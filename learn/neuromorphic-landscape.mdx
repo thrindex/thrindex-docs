@@ -37,7 +37,7 @@ Loihi 2 is the most programmable of the major neuromorphic chips. Its neuron mod
 **Neurons per chip:** Up to 1.2 million neurons (Akida 1.0)  
 **Interface:** PCIe (M.2 HAT for Raspberry Pi), SPI  
 **Precision:** 4-bit weights, 4-bit activations (Akida 1.0)  
-**Power:** ~300 mW peak, <1 mW idle  
+**Power:** ~300 mW peak, under 1 mW idle  
 **Access:** Commercially available (MetaTF developer kit, M.2 HAT)
 
 AKD1500 runs Akida 1.0, which is an integer feedforward architecture: Dense and Conv2d layers with bounded ReLU activation. It does **not** implement LIF neurons or temporal membrane dynamics. The chip performs spatial inference — one frame per forward call — not temporal SNN inference.
