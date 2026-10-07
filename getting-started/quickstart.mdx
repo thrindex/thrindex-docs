@@ -57,13 +57,15 @@ thrindex run model.thx
 
 The transcript prints to stdout. It is structured, machine-readable, and snapshot-tested — the format is a contract.
 
+This model has LIF layers. `thrindex run` executes it in the simulator. An AKD1500 deploy rejects LIF. A dense model takes the chip path in [Hardware targets](/systems/hardware-targets).
+
 ## Next steps
 
 <CardGroup cols={2}>
   <Card title="First model" href="/getting-started/first-model">
     Build, train, and run a model end to end with real data.
   </Card>
-  <Card title="Keyword spotting tutorial" href="/tutorials/keyword-spotting">
-    Full training run on the Spiking Heidelberg Digits dataset.
+  <Card title="AKD1500" href="/systems/hardware-targets">
+    Compile a dense model, deploy it from the Console, and read the float back on the device.
   </Card>
 </CardGroup>

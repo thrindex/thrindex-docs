@@ -199,11 +199,7 @@ The surrogate gradient (`FastSigmoid`) handles the non-differentiable spike func
 ```python
 import thrindex as thx
 
-# target="sim" — for simulation (default)
-thx.compile(model, "model.thx", target="sim")
-
-# target="akida-akd1500" — for AKD1500 hardware (Dense/Conv2d only, no LIF)
-thx.compile(model, "model.thx", target="akida-akd1500")
+thx.compile(model, "model.thx")
 ```
 
-See [Hardware Targets](/systems/hardware-targets) for the AKD1500 deployment guide.
+`sim` is the only compile target. Putting that file on an AKD1500 is the Console, which uses the device chip type. See [Hardware Targets](/systems/hardware-targets).

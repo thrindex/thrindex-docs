@@ -54,7 +54,7 @@ thrindex bench --conformance --target <target> [options]
 
 | Flag | Default | Description |
 |---|---|---|
-| `--target T` | — | Backend to test (`sim`, `loihi2`, ...) |
+| `--target T` | — | Backend to test. `sim` is the compiler target |
 | `--artifact F` | bundled | Path to `.thx` artifact to use as test model |
 | `--fixtures D` | bundled | Directory of fixture files (JSON spike rasters) |
 | `--n-samples N` | all | Number of fixture samples to use |
@@ -112,16 +112,13 @@ total params:  399380
 
 ## thrindex targets
 
-List available compilation and run targets.
+`sim` is the only compile target.
 
 ```bash
 thrindex targets
 ```
 
-```
-sim      behavioral simulator (reference)  ·  dt_ms=1.0  ·  delay_max=∞
-loihi2   Intel Loihi 2 (driver required)  ·  dt_ms=1.0  ·  delay_max=63
-```
+AKD1500 is not listed. The Console builds that program at deploy. On the device, send an input with `thrindex-runtime infer`. See [Hardware targets](/systems/hardware-targets).
 
 ## Exit codes
 

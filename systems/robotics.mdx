@@ -35,11 +35,13 @@ Sub-millisecond sensor-to-actuator loops. Frame-based inference adds latency you
 ```
 PyTorch authoring
       ↓
-thrindex compile → model.thx
+thx.compile → model.thx          ← target sim
       ↓
-thrindex run --target sim   ← validate, test, regression-test in CI
+thrindex run model.thx           ← simulator
       ↓
-thrindex run --target loihi2   ← deploy, same artifact
+Console deploy                   ← device chip type builds the program
+      ↓
+thrindex-runtime infer           ← on the device, floats stay there
 ```
 
-Same artifact. Sim and hardware are on the same conformance contract.
+`thrindex run --target loihi2` is not a deploy. See [Hardware targets](/systems/hardware-targets).

@@ -18,15 +18,14 @@ Possible causes:
 
 ## How to fix
 
-1. **Recompile for the correct target**: `thx.compile(model, "model.thx", target="loihi2")`.
+1. **Recompile** with `thx.compile(model, "model.thx")`. The compiler accepts `sim` only.
 2. **Verify the artifact is valid**: `thrindex doctor --check model.thx`.
-3. **Check backend compatibility**: ensure the backend driver version matches the artifact format version.
 
 ## Example
 
 ```
 E0201: backend could not parse artifact
-Why: missing required field `loihi2_core_map` — artifact was not compiled for this target
-Fix: verify the artifact was produced by `thrindex compile --target loihi2` and is not corrupted
+Why: {detail}
+Fix: verify the artifact was produced by `thrindex compile` and is not corrupted
 Docs: https://docs.thrindex.com/errors/E0201
 ```

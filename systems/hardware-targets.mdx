@@ -5,30 +5,38 @@ description: "How to compile and deploy THRINDEX models to neuromorphic hardware
 
 ## Overview
 
-THRINDEX separates compilation from execution. A model is compiled once to a `.thx` artifact that carries the target it was built for. On a machine with the appropriate hardware and driver, the artifact is loaded and run by the corresponding backend.
+THRINDEX separates the portable model from the chip. `thx.compile` writes a `.thx` with target `sim`. The Console turns that file into the AKD1500 program when you deploy. The Runtime on the device loads that program. The SDK does not talk to the chip.
 
 ```
-Developer machine           Device (e.g. Raspberry Pi + AKD1500)
-──────────────────          ───────────────────────────────────────
-thx.compile(model,          akida-runtime model.fbz
-  "model.thx",                  ← reads JSON batch from stdin
-  target="akida-akd1500")       → writes JSON output to stdout
-        ↓
-akida_compile.py
-  model.thx → model.fbz
+Developer machine              Console                         Device
+─────────────────              ───────                         ──────
+thx.compile → model.thx   →    Deploy to the device      →    Runtime loads the program
+                               (uses the device chip type)
 ```
+
+Inputs stay on the device. The Console does not receive them.
 
 ---
 
 ## BrainChip AKD1500
 
-The `akida-akd1500` target maps THRINDEX models to BrainChip's [Akida 1.0](https://doc.brainchipinc.com/) neuromorphic processor.
+AKD1500 is a chip. The SDK does not compile a `.thx` for it. This is the compile that works:
+
+```python
+import thrindex as thx
+
+thx.compile(model, "model.thx")
+```
+
+`thx.compile(..., target="akida-akd1500")` fails. The compiler accepts `sim` only. At deploy, the Console uses the device chip type and builds the chip program. The artifact's target field is not that program.
+
+`akida-akd1500` below is the name of the local backend and of the conformance exclusion. It is not a `thx.compile` target.
 
 ### Capability
 
 | Field | Value |
 |---|---|
-| Target name | `akida-akd1500` |
+| Backend name | `akida-akd1500` |
 | Native timestep | 1.0 ms |
 | Native delay support | None (`native_delay_max_steps = 0`) |
 | Delay fallback | Reject |
@@ -37,10 +45,11 @@ The `akida-akd1500` target maps THRINDEX models to BrainChip's [Akida 1.0](https
 
 ### What the AKD1500 supports
 
-AKD1500 executes feedforward integer networks. Supported layer types:
+AKD1500 executes feedforward integer networks. The compiler accepts dense layers only:
 
 - **Dense** (`snn.Dense`) — fully connected, no delays
-- **Conv2d** (`snn.Conv2d`) — 2D convolution, no delays
+
+Convolution is not compiled for this chip. A model that contains one is rejected.
 
 ### What the AKD1500 rejects
 
@@ -67,68 +76,37 @@ The quantization error is at most `scale / 2` per weight. For models with large 
 
 ---
 
-## Deployment: two-tier setup
+## Put a model on the chip
 
-AKD1500 deployment uses two separate machines:
-
-**Tier 1 — Developer machine** (Python + MetaTF)
-
-Requires: `thrindex` + `akida` Python package from BrainChip.
+1. Compile a dense model. `sim` is the only compile target:
 
 ```python
 import thrindex as thx
 
-# Compile to .thx — validates the model for akida-akd1500
-thx.compile(model, "model.thx", target="akida-akd1500")
+thx.compile(model, "model.thx")
 ```
 
-Then convert to the BrainChip `.fbz` runtime format:
+A model with a LIF layer or a convolution is rejected for this chip.
 
-```bash
-python akida_compile.py model.thx model.fbz
+2. In the Console, open **Devices → Connect a device**. Copy **Install** onto the machine that has the chip. The first time, also copy the Console key and run `sudo thrindex-runtime setup`. Setup prints a fingerprint. Use **Add device**, choose BrainChip AKD1500, and paste that fingerprint. When the device is already connected, run Install and `sudo systemctl restart thrindex-runtime`. Do not run setup again.
+
+3. Upload `model.thx` under **Artifacts**. Open it, choose the device, and press **Deploy to device**. Wait until the deployment is **Confirmed**. Confirmed means the program is on the chip. The chip computes when something on the device sends an input.
+
+## Send an input
+
+Software on the device sends one input and reads the floats back. The reference client is the Runtime CLI. It does not open the chip itself. The values never go to the Console.
+
+```sh
+printf '0.1 0.2 0.3 0.4\n' | thrindex-runtime infer
 ```
 
-`akida_compile.py` is included in `crates/thrindex-backends/akida/python/` in the THRINDEX repository.
+The input is whitespace-separated floats, one sample, as many values as the model's first dense layer expects. Each output float is printed on its own line.
 
-**Tier 2 — Device** (Raspberry Pi + AKD1500 via M.2)
+The socket is `/run/thrindex/infer.sock`, group `thrindex`, mode `0660`. A process in that group can connect. Otherwise use `sudo`. Add a user with `sudo usermod -aG thrindex <user>`.
 
-Requires: THRINDEX built with `--features hardware` and the BrainChip Engine Library.
+The frame is little-endian. A request is `THXI`, version `u16` = 1, flags `u16` = 0, count `u32`, then that many `f32`s. A response is `THXO`, version `u16` = 1, status `u16`, count `u32`, then the payload. Status `0` is that many floats. Status `1` is UTF-8, at most 400 bytes. More than 8192 floats is rejected.
 
-```bash
-# Set path to Engine Library source (obtained from BrainChip)
-export THRINDEX_AKIDA_ENGINE_PATH=/path/to/engine/engine
-
-# Build the runtime binary
-cargo build -p thrindex-backend-akida --features hardware --release
-
-# Run inference
-echo '{"batch": [[[0.5, 0.2, 0.8, ...]]]}' | \
-  akida-runtime model.fbz --pcie-addr 0001:01:00.0
-```
-
-The runtime reads a JSON batch on stdin and writes a JSON result on stdout:
-
-```json
-// stdin — shape [N_samples, T=1, n_features]
-{"batch": [[[0.5, 0.2, 0.8, 0.1, ...]]]}
-
-// stdout on success — shape [N_samples, n_outputs]
-{"outputs": [[0.03, 0.91, 0.02, 0.04]]}
-
-// stdout on error
-{"error": "E0407: ..."}
-```
-
-### Environment variables
-
-| Variable | Required | Description |
-|---|---|---|
-| `THRINDEX_AKIDA_ENGINE_PATH` | At build time | Path to the BrainChip Engine Library source drop |
-| `THRINDEX_AKIDA_DEVICE` | At runtime | PCIe address of the AKD1500 (default: `0001:01:00.0`) |
-
-### Getting the Engine Library
-
-The Engine Library is proprietary BrainChip software distributed to registered AKD1500 customers. It is not included in the THRINDEX repository. Contact [BrainChip](https://brainchipinc.com/) to obtain it.
+AKD1500 inputs are 4-bit and unsigned. Float `0` stays `0`. Float `1` is the top code. A value above `1` saturates. A value below `0` becomes `0`. The float that comes back can differ from the simulator by one 4-bit step. For a layer that copies its input, `0.1` comes back as `0.13333334` and `0.2` comes back as `0.2`.
 
 ---
 

@@ -32,7 +32,7 @@ Non-finite weights almost always indicate a numerical problem in the training pi
        assert torch.isfinite(param).all(), f"{name} contains non-finite values"
    ```
 
-4. **Recompile** the corrected model for `akida-akd1500`.
+4. **Compile** the corrected model with `thx.compile(model, "model.thx")`. The SDK accepts `sim` only. The Console builds the AKD1500 program at deploy.
 
 ## Example
 

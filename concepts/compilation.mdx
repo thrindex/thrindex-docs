@@ -27,17 +27,19 @@ The Python model stores `tau_mem`. The artifact stores `alpha`. You can reconstr
 
 ## Compile targets
 
-By default, `thx.compile` targets the behavioral simulator (`sim`). To compile for a specific hardware backend:
+`thx.compile` accepts `sim` only:
 
 ```python
-thx.compile(model, "model.thx", target="loihi2")
+thx.compile(model, "model.thx")
 ```
 
-The compiler loads the `loihi2` capability descriptor and applies target-specific transformations:
+`target="akida-akd1500"` and `target="loihi2"` fail. The compiler reports `unknown target`. AKD1500 is not a compile target. Upload the `.thx` in the Console and deploy it. The device chip type selects the program. See [Hardware targets](/systems/hardware-targets).
 
-- **Retiming**: if the target's native `dt` differs from the model's `dt`, weights and time constants are adjusted.
-- **Quantization advisory**: if the target is fixed-point, the compiler reports the expected quantization error bracket based on `CONFORMANCE_ENVELOPE_V0`.
-- **Delay negotiation**: if the model specifies delays and the target cannot represent them natively, the compiler inserts buffer stages or rejects.
+For `sim`, the compiler:
+
+- resolves `alpha` from `dt` and `tau_mem`
+- emulates delays
+- seals the file with a CRC32
 
 ## Compile-time advisories
 

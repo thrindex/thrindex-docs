@@ -1,6 +1,6 @@
 ---
 title: "E0404 — WrongTarget"
-description: "The artifact was compiled for a different target backend and cannot be run on akida-akd1500 without recompilation."
+description: "The local AKD1500 backend saw a .thx whose target is not akida-akd1500. The SDK compiler cannot emit that target."
 ---
 
 <Warning>E0404: artifact was not compiled for akida-akd1500</Warning>
@@ -15,24 +15,28 @@ A `.thx` artifact carries the target it was compiled for. The compiler resolves 
 
 ## How to fix
 
-Recompile the model for `akida-akd1500`:
+The SDK compiler only accepts `target="sim"`. This fails:
+
+```python
+thx.compile(model, "model.thx", target="akida-akd1500")
+```
+
+This is the compile that works:
 
 ```python
 import thrindex as thx
 
-thx.compile(model, "model.thx", target="akida-akd1500")
+thx.compile(model, "model.thx")
 ```
 
-Note that `akida-akd1500` rejects models containing [LIF layers](/errors/E0401) or [synaptic delays](/errors/E0402). If your model uses either, see those error pages for your options.
+Putting that file on an AKD1500 is the Console. The Console uses the device chip type and does not require the artifact target to be `akida-akd1500`. LIF layers and synaptic delays are still rejected for that chip. See [E0401](/errors/E0401) and [E0402](/errors/E0402).
 
 ## Example
 
 ```
 E0404: .thx artifact was compiled for target="sim", not "akida-akd1500".
 Observed: metadata.target = "sim".
-Why: A .thx artifact carries the target it was compiled for. Running it on a
-     different backend without recompilation may produce incorrect results.
-What to do: Recompile with target="akida-akd1500":
-              thrindex build --target akida-akd1500 model.py
+Why: A .thx artifact carries the target it was compiled for. Running it on a different backend without recompilation may produce incorrect results because resolved constants (alpha, dt_ms) are target-specific.
+What to do: The SDK compiler only accepts target "sim". thx.compile does not accept target "akida-akd1500". Deploy that .thx from the Console. The device chip type selects the AKD1500 program.
 Docs: https://docs.thrindex.com/errors/E0404
 ```

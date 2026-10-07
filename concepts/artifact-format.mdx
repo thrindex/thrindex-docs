@@ -57,7 +57,7 @@ The format is human-readable in principle (it is JSON), but weights are base64-e
 |---|---|---|
 | `format` | string | Artifact format version (`m2`, `m3`, ...) |
 | `thrindex_version` | string | THRINDEX version that compiled this artifact |
-| `target` | string | Compile target (`sim`, `loihi2`, ...) |
+| `target` | string | Compile target. `thx.compile` writes `sim` |
 | `dt_ms` | float | Simulation timestep in milliseconds |
 | `crc32` | hex string | CRC32 of the artifact body (excluding this field) |
 | `layers` | array | Ordered list of layer descriptors |

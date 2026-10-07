@@ -23,7 +23,7 @@ There is no mechanism to emulate per-synapse delays in a single-frame feedforwar
 thx.compile(model, "model.thx", target="sim")
 ```
 
-**Option B — Retrain without delays.** Remove the delay encoding from the model before compiling for `akida-akd1500`. This changes the model's temporal behaviour and will require retraining:
+**Option B — Retrain without delays.** Remove the delay encoding from the model before deploying it to an AKD1500 from the Console. This changes the model's temporal behaviour and will require retraining:
 
 ```python
 # Remove delays from Dense layers — only use in_features, out_features, bias

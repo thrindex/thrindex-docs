@@ -5,7 +5,7 @@ description: "How to implement and register a hardware backend, run the conforma
 
 ## Overview
 
-A THRINDEX backend is a Rust struct that implements the `Backend` trait from `thrindex-backend-api`. Once registered, it can be used with `thx.compile(target=name)` and `thrindex run --target name`.
+A THRINDEX backend is a Rust struct that implements the `Backend` trait from `thrindex-backend-api`. `thx.compile` accepts `sim` only. Registering a backend does not add a compile target.
 
 To earn the THRINDEX Certified [v0] badge, the backend must pass the conformance harness against `CONFORMANCE_ENVELOPE_V0` on the frozen 120-sample fixture set.
 
@@ -74,10 +74,9 @@ thx.register_target(
     capability=MyChipBackend().capability(),
     backend_cls=MyChipBackend,
 )
-
-# Now you can compile for this target
-thx.compile(model, "model.thx", target="mychip")
 ```
+
+`thx.compile` is unchanged. It still accepts `sim` only.
 
 ## Step 4: Run the conformance suite
 

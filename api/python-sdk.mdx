@@ -15,11 +15,9 @@ Compile a THRINDEX model to a `.thx` artifact.
 
 ```python
 thx.compile(
-    model: nn.Module,
+    model: snn.Sequential,
     path: str | os.PathLike,
     target: str = "sim",
-    dt: float = 1.0,
-    overwrite: bool = True,
 ) -> None
 ```
 
@@ -27,11 +25,9 @@ thx.compile(
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `model` | `nn.Module` | — | A `snn.Sequential` model (or any THRINDEX-compatible module) |
-| `path` | `str \| Path` | — | Output file path. Extension must be `.thx`. |
-| `target` | `str` | `"sim"` | Compilation target. `"sim"` for behavioral simulator; hardware targets require a driver. |
-| `dt` | `float` | `1.0` | Simulation timestep in ms. Overrides any `dt` set on individual layers. |
-| `overwrite` | `bool` | `True` | If False, raise `FileExistsError` if the output path exists. |
+| `model` | `snn.Sequential` | — | The only container `compile` accepts |
+| `path` | `str \| Path` | — | Output path. `.thx` is conventional |
+| `target` | `str` | `"sim"` | The only accepted value. Any other target fails |
 
 **Raises**
 
@@ -133,7 +129,7 @@ thx.register_target(
 
 **Notes**
 
-This is the extension point for hardware integrators. Once registered, the target name is accepted by `thx.compile(target=name)` and `thrindex run --target name`. See [conformance/adding-a-backend](/conformance/adding-a-backend) for the full integration guide.
+`thx.compile` still accepts `sim` only. A registered name does not become a compile target. See [conformance/adding-a-backend](/conformance/adding-a-backend).
 
 ## Constants
 
