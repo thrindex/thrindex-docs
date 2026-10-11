@@ -45,11 +45,12 @@ thx.compile(model, "model.thx")
 
 ### What the AKD1500 supports
 
-AKD1500 executes feedforward integer networks. The compiler accepts dense layers only:
+AKD1500 executes feedforward integer networks.
 
-- **Dense** (`snn.Dense`) — fully connected, no delays
+- **Dense** (`snn.Dense`) — fully connected, no delays. Pass `bias=False`. A non-zero bias is rejected (E0406) because this chip program has no bias input. A bias of all zeros is accepted. The default `bias=True` is not zero after training.
+- **Conv2d** (`snn.Conv2d`) — kernel 3, 5, or 7, image at least 5×5. Pass `input_height` and `input_width`; the layer does not store the image size.
 
-Convolution is not compiled for this chip. A model that contains one is rejected.
+A LIF layer is rejected. This chip has no membrane, so it cannot leak, integrate, or reset.
 
 ### What the AKD1500 rejects
 
@@ -82,11 +83,21 @@ The quantization error is at most `scale / 2` per weight. For models with large 
 
 ```python
 import thrindex as thx
+import thrindex.snn as snn
 
+model = snn.Sequential(
+    snn.Dense(4, 2, bias=False),
+)
 thx.compile(model, "model.thx")
 ```
 
-A model with a LIF layer or a convolution is rejected for this chip.
+`bias=False` is required. `snn.Dense` otherwise adds a bias, and the deploy is rejected rather than omitting it.
+
+A model with a LIF layer is rejected for this chip. A convolution passes the image size on the first layer:
+
+```python
+snn.Conv2d(1, 1, kernel_size=3, padding=1, bias=False, input_height=5, input_width=5)
+```
 
 2. In the Console, open **Devices → Connect a device**. Copy **Install** onto the machine that has the chip. The first time, also copy the Console key and run `sudo thrindex-runtime setup`. Setup prints a fingerprint. Use **Add device**, choose BrainChip AKD1500, and paste that fingerprint. When the device is already connected, run Install and `sudo systemctl restart thrindex-runtime`. Do not run setup again.
 
@@ -100,7 +111,13 @@ Software on the device sends one input and reads the floats back. The reference 
 printf '0.1 0.2 0.3 0.4\n' | thrindex-runtime infer
 ```
 
-The input is whitespace-separated floats, one sample, as many values as the model's first dense layer expects. Each output float is printed on its own line.
+The input is whitespace-separated floats, one sample. A dense model wants as many values as `in_features`. A convolution wants `input_height × input_width × in_channels` in row-major order, the last channel index changing fastest. Each output float is printed on its own line.
+
+A 5×5 center-tap convolution (kernel 3×3, only the center weight is 1, padding 1) copies each pixel with the same 4-bit rounding as the dense layer. Put `0.2` at the center, index 12. The other 24 values are `0`. The center line is `0.2`. The other lines are `0`.
+
+```sh
+python3 -c 'v=[0.0]*25; v[12]=0.2; print(*v)' | sudo thrindex-runtime infer
+```
 
 The socket is `/run/thrindex/infer.sock`, group `thrindex`, mode `0660`. A process in that group can connect. Otherwise use `sudo`. Add a user with `sudo usermod -aG thrindex <user>`.
 
