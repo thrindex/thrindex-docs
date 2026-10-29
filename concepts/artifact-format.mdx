@@ -72,8 +72,8 @@ The format is human-readable in principle (it is JSON), but weights are base64-e
 | `out_features` | int | Output dimension |
 | `weights` | base64 | `[out_features, in_features]` f32 array |
 | `bias` | base64 | `[out_features]` f32 array |
-| `delays` | base64 | `[out_features, in_features]` u8 array (optional) |
-| `delay_max` | int | Maximum delay value (optional, required if `delays` present) |
+| `delays_b64` | base64 | Little-endian `u16` array, `[out_features, in_features]`, one delay per connection. Omitted when every delay is 0. |
+| `delays_encoding` | string | `"dense"` or `"sparse"`. Present only together with `delays_b64`. |
 
 **LIF**
 
@@ -97,6 +97,9 @@ The format is human-readable in principle (it is JSON), but weights are base64-e
 | `stride` | int | Stride |
 | `weights` | base64 | `[out_ch, in_ch, kH, kW]` f32 array |
 | `bias` | base64 | `[out_ch]` f32 array |
+| `input_height`, `input_width` | int | Image size. Required on the first convolution so the simulator can shape the frame. |
+| `groups` | int | Grouping, default 1 when an older file omits it. |
+| `dilation` | int pair | Kernel spacing, default `[1, 1]` when an older file omits it. |
 
 ## The CRC32 seal
 

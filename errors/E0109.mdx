@@ -11,7 +11,7 @@ A Dense layer with delays enabled has a delay array whose length does not equal 
 
 ## Why
 
-The delay array is corrupt in the Graph IR. This should not occur if the model was built with `snn.Dense(..., delays=True)` using a current version of the Python SDK. If it does occur, there is a serialization bug.
+The delay array is corrupt in the Graph IR. A model built with `snn.Dense(..., delay=k)` writes one `u16` per connection. A length other than `in_features × out_features` means the file was damaged or hand-edited.
 
 ## How to fix
 

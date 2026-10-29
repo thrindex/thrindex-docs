@@ -17,11 +17,9 @@ thrindex run <artifact.thx> [options]
 
 | Flag | Default | Description |
 |---|---|---|
-| `--seed N` | `0` | RNG seed for reproducibility |
-| `--threads N` | all cores | Number of worker threads |
-| `--stdin` | — | Read spike raster JSON from stdin |
-| `--energy-coeff F` | `1.0` | Energy coefficient in pJ per syn-op |
-| `--quiet` | — | Print only the final prediction, no transcript |
+| `--input FILE` | demo input | JSON spike raster, or `-` for stdin. Shape `[batch, T, features]` |
+| `--seed N` | `0` | Seed recorded on the transcript |
+| `--threads N` | `0` (all CPUs) | Worker threads |
 
 **Output format**
 
@@ -44,17 +42,19 @@ The format is stable and snapshot-tested. Do not parse the separator lines; pars
 
 ## thrindex bench
 
-Run the conformance harness against a registered backend.
+This subcommand is the workspace binary `thrindex-cli`. The command from `pip install thrindex` implements `run` and `doctor`.
+
+Run the conformance harness. The simulator is compared with itself.
 
 ```bash
-thrindex bench --conformance --target <target> [options]
+thrindex bench --conformance --target sim [options]
 ```
 
 **Options**
 
 | Flag | Default | Description |
 |---|---|---|
-| `--target T` | — | Backend to test. `sim` is the compiler target |
+| `--target T` | — | Only `sim` |
 | `--artifact F` | bundled | Path to `.thx` artifact to use as test model |
 | `--fixtures D` | bundled | Directory of fixture files (JSON spike rasters) |
 | `--n-samples N` | all | Number of fixture samples to use |
@@ -110,21 +110,11 @@ layers:
 total params:  399380
 ```
 
-## thrindex targets
-
-`sim` is the only compile target.
-
-```bash
-thrindex targets
-```
-
-AKD1500 is not listed. The Console builds that program at deploy. On the device, send an input with `thrindex-runtime infer`. See [Hardware targets](/systems/hardware-targets).
-
 ## Exit codes
 
 | Code | Meaning |
 |---|---|
 | `0` | Success (PASS for conformance) |
 | `1` | Application error (FAIL for conformance, model error) |
-| `2` | Environment error (missing driver, bad artifact) |
+| `2` | Bad artifact or bad arguments |
 | `130` | Interrupted by user (Ctrl-C) |

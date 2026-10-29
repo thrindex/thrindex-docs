@@ -1,6 +1,6 @@
 ---
 title: "E0103 — DelayExceedsTargetMax"
-description: "A synaptic delay exceeds the target hardware's maximum, and the fallback is reject."
+description: "A synaptic delay is longer than the simulator will accept when emulation is off."
 ---
 
 <Warning>E0103: synaptic delay exceeds target maximum</Warning>
@@ -11,13 +11,12 @@ A synaptic delay in the model is larger than `native_delay_max_steps` for the co
 
 ## Why
 
-Hardware backends have a maximum delay register size. Loihi 2, for example, supports delays up to 63 timesteps natively. A model requiring delay=100 cannot be mapped to this hardware without emulation — and if emulation is disabled (`delay_fallback="reject"`), compilation fails.
+`thx.compile` writes a simulator artifact. The simulator emulates delays. This error is raised only when the descriptor's fallback is `reject` and a delay is longer than `native_delay_max_steps`.
 
 ## How to fix
 
 1. **Reduce the delay** to ≤ `max_steps`.
-2. **Switch to a target that supports longer delays or emulation**: the `sim` target emulates delays without limit. Use it for development, then reduce delays before targeting hardware.
-3. **Use a target with `delay_fallback="emulate"`**: this inserts buffer stages in the network graph, allowing longer delays at the cost of increased model size and memory.
+2. **Compile with the default call** `thx.compile(model, "model.thx")`. The simulator emulates delays.
 
 ## Example
 

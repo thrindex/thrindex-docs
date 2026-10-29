@@ -32,7 +32,8 @@ model = snn.Sequential(*layers)
 
 - `Sequential` is a `torch.nn.Module`. `.parameters()`, `.state_dict()`, `.to(device)`, and all standard PyTorch optimizer integrations work as expected.
 - LIF state is reset to zero at the start of every `forward` call. It is not persistent across batches.
-- Non-LIF layers (Dense, Conv2d, standard `torch.nn` modules) are called without state at each timestep.
+- A `Dense` with `delay=0` is applied to the current vector. A positive `delay` reads a vector `Sequential` kept from an earlier timestep. That buffer is cleared at the start of every `forward`, together with the membrane.
+- `forward_recorded(x)` returns the same output plus each layer's spikes and, for every LIF, the membrane compared with the threshold before reset.
 
 **Example**
 
@@ -62,6 +63,7 @@ layer = snn.Dense(
     in_features: int,
     out_features: int,
     bias: bool = True,
+    delay: int = 0,
 )
 ```
 
@@ -72,6 +74,7 @@ layer = snn.Dense(
 | `in_features` | `int` | — | Input feature dimension |
 | `out_features` | `int` | — | Output feature dimension |
 | `bias` | `bool` | `True` | Whether to include a bias vector |
+| `delay` | `int` | `0` | Timesteps to hold the input. `0` is the current step. Maximum `65535`. |
 
 **Weight initialization**
 
@@ -79,8 +82,8 @@ Kaiming uniform (fan-in mode), matching `torch.nn.Linear`.
 
 **Notes**
 
-- Equivalent to `torch.nn.Linear`. No temporal state.
-- Applied at every timestep independently.
+- The multiply is `torch.nn.Linear`.
+- `delay=0` does not store delay bytes. A positive delay is one `u16` per connection in the `.thx` file. See [Synaptic Delays](/concepts/delays).
 
 ---
 
@@ -150,7 +153,11 @@ layer = snn.Conv2d(
     kernel_size: int | tuple[int, int],
     stride: int = 1,
     padding: int = 0,
+    dilation: int = 1,
+    groups: int = 1,
     bias: bool = True,
+    input_height: int | None = None,
+    input_width: int | None = None,
 )
 ```
 
@@ -163,7 +170,11 @@ layer = snn.Conv2d(
 | `kernel_size` | `int \| tuple` | — | Kernel height and width |
 | `stride` | `int` | `1` | Convolution stride |
 | `padding` | `int` | `0` | Zero-padding on all sides |
+| `dilation` | `int` | `1` | Space between kernel elements |
+| `groups` | `int` | `1` | Same grouping rule as `torch.nn.Conv2d` |
 | `bias` | `bool` | `True` | Whether to include per-channel bias |
+| `input_height` | `int \| None` | `None` | Height of the image this layer reads, required on the first convolution so the simulator knows the frame |
+| `input_width` | `int \| None` | `None` | Width of that image |
 
 **Input / Output shapes**
 
@@ -202,4 +213,4 @@ import thrindex as thx
 thx.compile(model, "model.thx")
 ```
 
-`sim` is the only compile target. Putting that file on an AKD1500 is the Console, which uses the device chip type. See [Hardware Targets](/systems/hardware-targets).
+The file is a simulator artifact. Run it with `thrindex run model.thx`.

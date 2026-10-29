@@ -7,17 +7,16 @@ description: "The target has no delay support and emulation is disabled."
 
 ## What happened
 
-The model uses synaptic delays (`delays=True` on a Dense layer), but the compilation target declares `native_delay_max_steps=0` and `delay_fallback="reject"`. The target cannot implement delays at all, and no fallback is configured.
+The model sets `delay` above 0 on a Dense layer, but the compilation target declares `native_delay_max_steps=0` and `delay_fallback="reject"`. The target cannot implement delays at all, and no fallback is configured.
 
 ## Why
 
-Some hardware backends do not implement delay registers. If a model requires delays and the target cannot handle them — neither natively nor by emulation — compilation must fail.
+The simulator emulates delays. This error is raised when a descriptor says it has no delay steps and its fallback is `reject`.
 
 ## How to fix
 
-1. **Use the `sim` target**: `thx.compile(model, "model.thx", target="sim")`. The simulator emulates delays via ring buffers without limit.
-2. **Remove delays from the model**: set `delays=False` (or do not specify `delays`) on Dense layers.
-3. **Use a different hardware target** that supports delays.
+1. **Compile with the default call**: `thx.compile(model, "model.thx")`. The simulator emulates delays.
+2. **Remove the lag**: construct the dense layer with `delay=0`, which is the default.
 
 ## Example
 

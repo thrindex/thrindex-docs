@@ -119,32 +119,6 @@ where `rate[b, n] = mean_t(spikes[b, t, n])`.
 
 Typical values: `target_rate=0.05` (5% activity) with `weight=1e-3`. Increase `weight` if the network develops dead neurons or saturates.
 
-## thx_train.DelayOptimizer
+## Delays are not an optimizer
 
-An optimizer wrapper that handles integer delay learning via a straight-through gradient estimator.
-
-```python
-delay_opt = thx_train.DelayOptimizer(
-    model: nn.Module,
-    lr_weights: float = 1e-3,
-    lr_delays: float = 0.1,
-    delay_update_every: int = 5,
-)
-
-delay_opt.zero_grad()
-loss.backward()
-delay_opt.step()
-```
-
-**Parameters**
-
-| Name | Type | Default | Description |
-|---|---|---|---|
-| `model` | `nn.Module` | — | Model with `delays=True` layers |
-| `lr_weights` | `float` | `1e-3` | Learning rate for weights (passed to Adam) |
-| `lr_delays` | `float` | `0.1` | Effective step size for delay updates |
-| `delay_update_every` | `int` | `5` | Update delays every N gradient steps |
-
-**Notes**
-
-Delays are integers. The `DelayOptimizer` maintains a continuous surrogate for each delay, updates the surrogate with the straight-through gradient from the backward pass, and rounds to the nearest integer every `delay_update_every` steps. Delays are clamped to `[1, max_delay]` after each update.
+`snn.Dense(..., delay=k)` is a fixed integer. Train the weights with Adam, or any other PyTorch optimizer, the same way as a layer with `delay=0`. There is no delay optimizer in this package. See [Synaptic Delays](/concepts/delays).

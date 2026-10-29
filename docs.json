@@ -59,17 +59,6 @@
             ]
           },
           {
-            "group": "Systems",
-            "pages": [
-              "systems/overview",
-              "systems/hardware-targets",
-              "systems/robotics",
-              "systems/drones-uavs",
-              "systems/aerospace-space",
-              "systems/defense"
-            ]
-          },
-          {
             "group": "API Reference",
             "pages": [
               "api/python-sdk",
@@ -93,6 +82,7 @@
               "errors/E0008",
               "errors/E0009",
               "errors/E0010",
+              "errors/E0011",
               "errors/E0101",
               "errors/E0102",
               "errors/E0103",
@@ -109,12 +99,7 @@
               "errors/E0205",
               "errors/E0206",
               "errors/E0207",
-              "errors/E0208",
-              "errors/E0401",
-              "errors/E0402",
-              "errors/E0403",
-              "errors/E0404",
-              "errors/E0407"
+              "errors/E0208"
             ]
           },
           {
@@ -129,8 +114,7 @@
             "group": "Conformance",
             "pages": [
               "conformance/overview",
-              "conformance/envelope-v0",
-              "conformance/adding-a-backend"
+              "conformance/envelope-v0"
             ]
           }
         ]
@@ -156,11 +140,8 @@
             ]
           },
           {
-            "group": "Hardware",
+            "group": "Simulator",
             "pages": [
-              "learn/neuromorphic-hardware",
-              "learn/neuromorphic-landscape",
-              "learn/neuromorphic-vs-gpu",
               "learn/energy-model"
             ]
           },

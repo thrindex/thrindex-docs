@@ -37,9 +37,9 @@ synaptic_ops: 124800
 
 ## The coefficient
 
-**1 pJ per syn-op is a literature-derived estimate** for digital synchronous neuromorphic chips (Loihi-class). It is not a measurement from any specific chip or workload.
+The simulator multiplies synaptic operations by a coefficient taken from published papers. It is not a measurement this project made, and those papers are not compile targets.
 
-Published figures from the literature:
+Published figures:
 
 | System | syn-op energy | Source |
 |--------|--------------|--------|
@@ -48,13 +48,13 @@ Published figures from the literature:
 | IBM TrueNorth | ~26 pJ/syn-op | Merolla et al. (2014) |
 | SpiNNaker 2 | ~5 pJ/syn-op | Mayr et al. (2019) |
 
-The THRINDEX default of 1 pJ is consistent with modern 7 nm digital neuromorphic chips. It is deliberately conservative.
+The transcript uses the coefficient shipped with the simulator. The table is only the source of that kind of number.
 
 ## Comparing to a GPU baseline
 
 A GPU running a conventional ANN with the same task uses floating-point multiply-accumulate (MAC) operations. A modern GPU does a MAC in approximately 0.1–0.5 pJ, but every neuron performs a MAC on every forward pass — there is no sparsity.
 
-An SNN on neuromorphic hardware only spends energy when a neuron spikes. If the average firing rate is 5% (5 spikes per neuron over 100 timesteps), the active computation is 5% of what a dense ANN would do.
+In this model a synapse costs energy only when its neuron spikes. If the average firing rate is 5% (5 spikes per neuron over 100 timesteps), the counted operations are 5% of a dense pass.
 
 The comparison is:
 
@@ -77,8 +77,4 @@ The energy model exists to make design tradeoffs visible during model developmen
 
 ## Changing the coefficient
 
-```bash
-thrindex run model.thx --energy-coeff 3.0
-```
-
-Sets the coefficient to 3 pJ/syn-op. Use this when you have a measurement from your specific target chip. The formula is unchanged; only the multiplier changes.
+`thrindex run` uses the coefficient built into the simulator. There is no flag to replace it.

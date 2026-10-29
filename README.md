@@ -31,6 +31,7 @@ errors/            Stable E#### error codes
 benchmarks/        Committed validation results
 conformance/       THRINDEX Certified specification
 logo/              Brand assets (light.svg, dark.svg)
+images/banner.png  Home and GitHub banner
 ```
 
 ## Contributing

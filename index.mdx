@@ -11,7 +11,9 @@ keywords:
   - thrindex
 ---
 
-Author a model. Compile to a sealed `.thx` artifact. Run on the behavioral simulator or neuromorphic hardware — same command, same transcript, same conformance contract.
+<img src="/images/banner.png" alt="Thrindex — The open neuromorphic compute engine" />
+
+Author a model. Compile to a sealed `.thx` artifact. Run it on the behavioral simulator.
 
 <CardGroup cols={3}>
   <Card title="Deterministic" icon="lock">
@@ -20,8 +22,8 @@ Author a model. Compile to a sealed `.thx` artifact. Run on the behavioral simul
   <Card title="Energy-proportional" icon="bolt">
     Energy scales with spike count, not model size. Silent inputs cost nothing.
   </Card>
-  <Card title="Hardware-portable" icon="microchip">
-    Compile once. Validate on the simulator. Deploy the same artifact to neuromorphic silicon.
+  <Card title="Sealed file" icon="file">
+    `thx.compile` writes one `.thx` file. The simulator runs that file.
   </Card>
 </CardGroup>
 
@@ -49,26 +51,9 @@ thx.compile(model, "model.thx")
 thrindex run model.thx
 ```
 
-## Built for systems where physics decides the stack
-
-<CardGroup cols={2}>
-  <Card title="Robotics" icon="robot" href="/systems/robotics">
-    Sub-millisecond sensor-to-actuator loops. Event-driven — quiet when the arm is still.
-  </Card>
-  <Card title="Drones & UAVs" icon="plane" href="/systems/drones-uavs">
-    Energy scales with information rate. Onboard inference without GPU-class power.
-  </Card>
-  <Card title="Aerospace & Space" icon="satellite" href="/systems/aerospace-space">
-    Finite power for years. No cloud. Verifiable before launch.
-  </Card>
-  <Card title="Defense" icon="shield" href="/systems/defense">
-    Reproducible builds, offline verification, evidence packages auditors can review.
-  </Card>
-</CardGroup>
-
 ## THRINDEX Certified
 
-Hardware backends earn the badge by passing the conformance harness against `CONFORMANCE_ENVELOPE_V0` — a derived bound on divergence from the float reference simulator.
+The conformance harness checks a model against `CONFORMANCE_ENVELOPE_V0`, the bound on how far an int8 run may diverge from the float reference simulator.
 
 | Metric | Threshold | Meaning |
 |---|---|---|
@@ -80,9 +65,9 @@ Hardware backends earn the badge by passing the conformance harness against `CON
 
 ## What THRINDEX is not
 
-- **Not a general-purpose framework.** Spiking neural networks on neuromorphic hardware — specifically.
+- **Not a general-purpose framework.** Spiking neural networks: layers, training, a sealed file, and the simulator.
 - **Not a black box.** Every run prints a structured transcript: spike counts, syn-ops, energy estimate.
-- **Not an abstraction over hardware.** A deterministic model of what happens on the target, with a conformance bound on divergence.
+- **Not a chip toolchain.** The `.thx` file is what the simulator runs.
 
 <CardGroup cols={2}>
   <Card title="Get started" icon="rocket" href="/getting-started/installation">

@@ -47,7 +47,7 @@ The result is a causal learning rule: synapses that helped cause a spike are str
 
 **Online.** STDP updates happen in real time as spikes arrive. There is no batch gradient accumulation, no forward-backward pass, and no stored activations. This makes it compatible with continuous, streaming data.
 
-**Energy-efficient learning.** Because updates are local and event-driven, STDP can in principle be implemented on-chip with very low power. Some neuromorphic chips (notably Intel Loihi 2) implement STDP or variants of it directly in hardware.
+**Local updates.** Because each synapse looks only at its two neurons, an STDP rule does not need a global loss. Thrindex does not implement that rule.
 
 ---
 
@@ -69,7 +69,7 @@ This is the central practical question: for a given task, which learning rule sh
 |---|---|---|
 | Requires labeled data | No | Yes |
 | Achieves competitive accuracy | Rarely | Yes (on most tasks) |
-| On-chip hardware support | Loihi 2, some others | Not directly (needs backprop infrastructure) |
+| Where the update runs | Research literature | PyTorch, on the machine that trains |
 | Online / streaming | Yes | Limited (requires episode boundaries) |
 | Global error signal | Not required | Required |
 | Biological plausibility | High | Low |
@@ -85,7 +85,7 @@ STDP remains the better choice for: unsupervised feature learning as a pre-train
 
 THRINDEX currently trains with surrogate gradient descent. STDP is not implemented as a training mode.
 
-The design decision: THRINDEX targets production deployment — compiling a trained model to a `.thx` artifact and running it on hardware. The training step that precedes compilation is intended to be as reliable as possible, which means gradient-based training on a standard PyTorch loop.
+The design decision: training uses surrogate gradients in PyTorch, then `thx.compile` seals a `.thx` file the simulator can run.
 
 If STDP-based pre-training or online adaptation become practical for production use cases, this is a natural extension of the compile pipeline. The architecture of the `Backend` trait and the `.thx` artifact format does not preclude it.
 

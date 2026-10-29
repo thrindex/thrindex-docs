@@ -27,8 +27,8 @@ Run date: 2026-07-16. Hardware: Apple M4 Pro (CPU, single sample, single thread)
 | Avg synaptic operations | 3,664,877 |
 | Avg firing rate | 9.9% of dense maximum |
 | **Modeled energy** | **1,832 nJ** |
-| Coefficient | 0.5 pJ/syn-op (7nm neuromorphic silicon reference) |
-| Sim wall time | 14.2 ms (CPU simulator — not the deployment target) |
+| Coefficient | 0.5 pJ/syn-op (published literature estimate) |
+| Sim wall time | 14.2 ms (CPU simulator) |
 
 ### Dense MLP baselines
 
@@ -60,11 +60,7 @@ A rate-collapsed MLP with equivalent accuracy would require a substantially larg
 
 ## Latency note
 
-The SNN simulator wall time (14.2 ms) reflects the **thrindex CPU simulation tool** — a debug and validation artifact, not the deployment target. Neuromorphic silicon operates at hardware speed, typically 10–100× faster than an equivalent CPU simulation.
-
-The MLP wall times (Baseline A: 0.012 ms, Baseline B: 1.18 ms) are measured on the same CPU for a consistent comparison point.
-
-**No latency comparison between neuromorphic hardware and GPU is made here.** That comparison requires M6 silicon bring-up.
+The SNN wall time (14.2 ms) is the CPU simulator. The MLP wall times (Baseline A: 0.012 ms, Baseline B: 1.18 ms) are measured on the same CPU.
 
 ## Reproducing
 

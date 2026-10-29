@@ -1,0 +1,18 @@
+---
+title: "E0011 — SpatialShape"
+description: "A convolution or flatten could not be executed with the shape it was given."
+---
+
+## What happened
+
+The simulator reached a `Conv2d` or `Flatten` layer and refused to run it. The frame was the wrong rank, the image size was missing, the kernel did not fit, or a dense layer received an image.
+
+## Why
+
+Convolution needs a height and a width. The first `snn.Conv2d` stores them only when you pass `input_height` and `input_width`. A dense layer reads a vector, so a convolution has to be flattened first. The simulator does not guess either of these.
+
+## How to fix
+
+1. Construct the first convolution with `input_height` and `input_width`, then recompile.
+2. Put `snn.Flatten()` between the last spatial map and the next `snn.Dense`.
+3. If the kernel is larger than the frame, use the padding that makes the same `torch.nn.Conv2d` run.

@@ -1,34 +1,29 @@
 ---
-title: "E0204 — Execution (backend)"
-description: "The hardware backend reported an execution error."
+title: "E0204 — Execution"
+description: "The simulator could not run this artifact."
 ---
 
 <Warning>E0204: backend execution failed</Warning>
 
 ## What happened
 
-The hardware backend's execution path returned an error. The model loaded successfully, the input shape was valid, but the actual inference call failed.
+The artifact parsed, and the input shape was accepted, but the run failed. The detail line is the simulator's reason.
 
 ## Why
 
-This is a backend-specific error. Common causes:
-- The hardware driver is not installed or not running
-- The hardware device is not connected or not powered
-- The device ran out of neuron core resources for this model
-- A driver API call timed out or returned an unexpected status code
+The failure is in the detail string. Typical causes are a bad artifact, an input that does not match the model, or an internal simulator error.
 
 ## How to fix
 
-1. **Check the driver**: ensure the hardware driver is installed and the device is connected. For Loihi 2: verify `nxsdk` is installed and `lsusb` shows the device.
-2. **Check device resources**: the model may require more neuron cores than are available. Try a smaller model.
-3. **Check the error detail**: the error message includes a backend-specific `detail` string from the driver. Use it to diagnose the hardware-level failure.
-4. **Run on sim first**: `thrindex run model.thx --target sim` to confirm the artifact is valid before debugging hardware.
+1. Read the detail line.
+2. Check the artifact with `thrindex doctor --check model.thx`.
+3. Re-run with `thrindex run model.thx`.
 
 ## Example
 
 ```
 E0204: backend execution failed
-Why: loihi2 driver returned status RESOURCE_EXHAUSTED: model requires 128 cores, device has 64
-Fix: check backend driver and hardware connection
+Why: <detail from the simulator>
+Fix: read the detail and correct the artifact or the input
 Docs: https://docs.thrindex.com/errors/E0204
 ```

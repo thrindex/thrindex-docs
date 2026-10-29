@@ -25,17 +25,13 @@ description: "What thrindex.compile does, what the compiler resolves, and what d
 
 The Python model stores `tau_mem`. The artifact stores `alpha`. You can reconstruct `tau_mem` from `alpha` and `dt_ms`, but there is no round-trip guarantee for `tau_syn` if it was not explicitly set (the default means no synaptic filter, which is distinct from `tau_syn = dt`).
 
-## Compile targets
-
-`thx.compile` accepts `sim` only:
+## What compile writes
 
 ```python
 thx.compile(model, "model.thx")
 ```
 
-`target="akida-akd1500"` and `target="loihi2"` fail. The compiler reports `unknown target`. AKD1500 is not a compile target. Upload the `.thx` in the Console and deploy it. The device chip type selects the program. See [Hardware targets](/systems/hardware-targets).
-
-For `sim`, the compiler:
+The file is marked `target` `sim`. That is the simulator artifact. The compiler:
 
 - resolves `alpha` from `dt` and `tau_mem`
 - emulates delays

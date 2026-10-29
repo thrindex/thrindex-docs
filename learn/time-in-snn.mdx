@@ -19,7 +19,7 @@ $$
 
 For `dt = 1 ms`, `tau_mem = 20 ms` → `α ≈ 0.951`. For `dt = 2 ms` → `α ≈ 0.905`. The same biological time constant produces different discrete dynamics at different `dt`.
 
-`dt` is declared in the THRINDEX model and stored in the `.thx` artifact. It is not a runtime parameter. When a model is compiled for a hardware backend with a different native `dt`, the compiler recomputes `alpha` and issues a retiming advisory.
+`dt` is declared in the THRINDEX model and stored in the `.thx` artifact. It is not a runtime parameter. Compile resolves `alpha = exp(-dt / tau_mem)` and stores that constant in the file.
 
 ## The spike raster
 
@@ -52,6 +52,4 @@ The practical design rule: use the shortest T that achieves your accuracy target
 
 ## Synaptic delays
 
-Delays are an additional temporal dimension: a synapse can be configured to transmit its spike with a lag of `D` timesteps. This allows a network to represent temporal relationships in the input without increasing T.
-
-THRINDEX supports per-connection integer delays in the `.thx` artifact. On hardware backends, delays may be native (the hardware has explicit delay registers) or emulated (the compiler inserts buffer stages). The delay semantics, encoding, and negotiation policy are specified in [Concepts: Delays](/concepts/delays).
+A dense layer can hold its input for `D` timesteps before the multiply. `D = 0` is the current step. The simulator applies the same shift. The encoding is in [Concepts: Delays](/concepts/delays).
