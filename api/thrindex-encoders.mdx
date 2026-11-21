@@ -1,6 +1,6 @@
 ---
 title: "thrindex.encoders"
-description: "Input encoding utilities: rate coding, temporal contrast, cochlear filter bank."
+description: "Spike encoding functions: rate, latency, and delta."
 ---
 
 ## Import
@@ -9,112 +9,110 @@ description: "Input encoding utilities: rate coding, temporal contrast, cochlear
 import thrindex.encoders as enc
 ```
 
-Encoders convert raw input data into spike rasters suitable for THRINDEX models. Every encoder produces a tensor of shape `[batch, T, n_features]` with values in {0, 1}.
+All encoders produce a tensor of shape `[T, *input_shape]` with values in {0.0, 1.0}. THRINDEX uses **time-first** convention throughout.
 
-## enc.rate_encode
+---
 
-Encodes real-valued input as a Poisson spike process over T timesteps.
+## enc.rate
+
+Bernoulli spike encoder. Each element of the input is treated as a firing probability and sampled independently at each timestep.
 
 ```python
-spikes = enc.rate_encode(
-    x: torch.Tensor,          # [batch, n_features], values in [0, 1]
+spikes = enc.rate(
+    x: torch.Tensor,                # [batch, *], values in [0, 1]
     T: int,
-    seed: int | None = None,
-) -> torch.Tensor              # [batch, T, n_features], binary
+    generator: torch.Generator,    # explicit, required
+) -> torch.Tensor                   # [T, batch, *], binary
 ```
 
 **Parameters**
 
 | Name | Type | Description |
 |---|---|---|
-| `x` | `Tensor[batch, n]` | Input firing rates, normalized to [0, 1] |
-| `T` | `int` | Number of timesteps |
-| `seed` | `int \| None` | Optional RNG seed for reproducibility |
+| `x` | `Tensor` | Input values, clamped to `[0, 1]` before sampling. |
+| `T` | `int` | Number of timesteps to generate. |
+| `generator` | `torch.Generator` | Explicit RNG. This function never touches global torch RNG state. |
 
-**Behavior**
-
-Each input value `x[b, i]` is treated as a probability: at each timestep `t`, neuron `i` fires with probability `x[b, i]`. The output is a Bernoulli sample over `[batch, T, n_features]`.
+The `generator` is **required** - there is no optional seed shortcut. Construct and seed it in the calling scope:
 
 ```python
 import torch
 import thrindex.encoders as enc
 
-x = torch.rand(4, 784)           # 4 MNIST samples, normalized
-spikes = enc.rate_encode(x, T=100, seed=42)
-# spikes: [4, 100, 784], binary
+gen = torch.Generator()
+gen.manual_seed(42)
+
+x = torch.rand(32, 700)        # 32 samples, 700 features
+spikes = enc.rate(x, T=100, generator=gen)
+# spikes: [100, 32, 700], binary
 ```
 
-## enc.temporal_contrast
+**Behavior:** `spike[t, b, i] ~ Bernoulli(x[b, i])` independently for each t. The expected firing rate of feature i is exactly `x[b, i]`.
 
-Encodes a temporal signal (audio, sensor) using temporal contrast: a spike is emitted when the signal changes by more than a threshold, with separate ON (increase) and OFF (decrease) channels.
+---
+
+## enc.latency
+
+Deterministic time-to-first-spike encoder. Higher input values fire earlier; lower values fire later or not at all.
 
 ```python
-spikes = enc.temporal_contrast(
-    x: torch.Tensor,          # [batch, T_input, n_features]
+spikes = enc.latency(
+    x: torch.Tensor,   # [batch, *], values in [0, 1]
+    T: int,
+) -> torch.Tensor       # [T, batch, *], binary
+```
+
+**Parameters**
+
+| Name | Type | Description |
+|---|---|---|
+| `x` | `Tensor` | Input values, clamped to `[0, 1]`. |
+| `T` | `int` | Number of timesteps. |
+
+**Behavior:** spike time is `floor((1 - x) * T)`, clamped to `[0, T)`. A value of 1.0 fires at t=0; a value of 0.0 never fires within T timesteps. Each feature fires at most once. No RNG is used.
+
+```python
+spikes = enc.latency(x, T=100)
+# spikes: [100, 32, 700], binary - each spatial location fires at most once
+```
+
+---
+
+## enc.delta
+
+Deterministic change encoder. Fires when the absolute change in the input from one timestep to the next exceeds a threshold.
+
+```python
+spikes = enc.delta(
+    x: torch.Tensor,          # [T, batch, *]
+    T: int,
     threshold: float = 0.1,
-    cumulative: bool = True,
-) -> torch.Tensor              # [batch, T_input, 2 × n_features], binary
+) -> torch.Tensor              # [T, batch, *], binary
 ```
 
 **Parameters**
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `x` | `Tensor[batch, T, n]` | — | Input signal time series |
-| `threshold` | `float` | `0.1` | Minimum change required to emit a spike |
-| `cumulative` | `bool` | `True` | If True, tracks accumulated change; if False, frame-to-frame difference only |
+| `x` | `Tensor[T, batch, *]` | - | Time-series input. `x.shape[0]` must equal `T`. |
+| `T` | `int` | - | Expected number of timesteps. |
+| `threshold` | `float` | `0.1` | Minimum absolute change required to fire. |
 
-**Output channels**
-
-The output has `2 × n_features` channels:
-- Channels `0..n`: ON events (signal increased by ≥ threshold)
-- Channels `n..2n`: OFF events (signal decreased by ≥ threshold)
-
-This matches the DVS event camera polarity convention.
-
-## enc.cochlear_encode
-
-Encodes an audio waveform through a bank of bandpass filters (cochlear model) into a spike raster. Produces the SHD-compatible encoding used in the keyword-spotting tutorial.
+**Behavior:** `spike[t] = 1` where `|x[t] - x[t-1]| > threshold`. At t=0 the reference is zeros. No RNG is used. Raises `ValueError` if `x.shape[0] != T`.
 
 ```python
-spikes = enc.cochlear_encode(
-    waveform: torch.Tensor,   # [batch, n_samples], 16kHz audio
-    n_channels: int = 700,
-    T: int = 100,
-    freq_min: float = 100.0,
-    freq_max: float = 8000.0,
-) -> torch.Tensor              # [batch, T, n_channels], binary
+# x is a time-series of sensor values: [T, batch, n_features]
+spikes = enc.delta(x, T=x.shape[0], threshold=0.05)
 ```
 
-**Parameters**
+---
 
-| Name | Type | Default | Description |
+## Encoder comparison
+
+| Encoder | Information | Deterministic | Input shape |
 |---|---|---|---|
-| `waveform` | `Tensor[batch, n_samples]` | — | Raw 16kHz audio signal |
-| `n_channels` | `int` | `700` | Number of frequency channels (matches SHD) |
-| `T` | `int` | `100` | Number of output timesteps |
-| `freq_min` | `float` | `100.0` | Lowest frequency channel center (Hz) |
-| `freq_max` | `float` | `8000.0` | Highest frequency channel center (Hz) |
+| `rate` | Mean firing rate | No (requires generator) | `[batch, *]` |
+| `latency` | Spike timing | Yes | `[batch, *]` |
+| `delta` | Change detection | Yes | `[T, batch, *]` |
 
-**Notes**
-
-- Frequency bands are spaced logarithmically between `freq_min` and `freq_max`.
-- Each channel fires when the bandpass-filtered signal exceeds its local threshold (set at 2σ from the silence baseline).
-- This encoder is consistent with the SHD dataset's cochlear model but is independently implemented.
-
-## enc.SHDLoader
-
-A dataset loader that returns pre-encoded SHD spike rasters directly.
-
-```python
-from thrindex.encoders import SHDLoader
-
-train_set = SHDLoader(root="/path/to/shd", split="train", T=100)
-test_set  = SHDLoader(root="/path/to/shd", split="test", T=100)
-
-x, y = train_set[0]
-# x: [100, 700], binary
-# y: int, class label 0–19
-```
-
-`SHDLoader` downloads and caches the dataset from the official source on first use. It returns pre-binned spike rasters in the THRINDEX-native format.
+For pre-encoded spike datasets (SHD, N-MNIST, DVS Gesture, CIFAR10-DVS), the THRINDEX app handles encoding internally. The encoders module is for custom value datasets loaded via Own values.

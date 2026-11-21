@@ -1,6 +1,6 @@
 ---
 title: "thrindex.train"
-description: "Loss functions, schedulers, and training utilities for spiking neural networks."
+description: "Loss functions and training utilities for spiking neural networks."
 ---
 
 ## Import
@@ -9,116 +9,88 @@ description: "Loss functions, schedulers, and training utilities for spiking neu
 import thrindex.train as thx_train
 ```
 
-## thx_train.rate_loss
-
-Cross-entropy loss over spike counts (rate coding). The canonical loss function for THRINDEX classifiers.
+The canonical training loop:
 
 ```python
-loss = thx_train.rate_loss(
-    spikes: torch.Tensor,     # [batch, T, n_classes]
-    targets: torch.Tensor,    # [batch], long
-    reduction: str = "mean",
-) -> torch.Tensor              # scalar
-```
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-**Parameters**
-
-| Name | Type | Default | Description |
-|---|---|---|---|
-| `spikes` | `Tensor[batch, T, n]` | — | Output spike raster from the model |
-| `targets` | `Tensor[batch]` | — | Integer class labels |
-| `reduction` | `str` | `"mean"` | `"mean"`, `"sum"`, or `"none"` |
-
-**Behavior**
-
-Computes spike counts per neuron (sum over T), then applies standard cross-entropy:
-
-```
-counts[b, n] = sum_t spikes[b, t, n]
-loss = cross_entropy(counts, targets)
-```
-
-This is equivalent to treating spike counts as unnormalized logits. The model's output neurons compete to spike the most — the one that wins is the prediction.
-
-**Usage**
-
-```python
-for x, y in train_loader:
-    out = model(x)                        # [batch, T, n_classes]
-    loss = thx_train.rate_loss(out, y)
+for x, labels in dataloader:
+    # x: [T, batch, in_features]
+    spikes = model(x)                          # [T, batch, n_classes]
+    loss = thx_train.rate_loss(spikes, labels)
     loss.backward()
     optimizer.step()
     optimizer.zero_grad()
 ```
 
-## thx_train.reconstruction_loss
+---
 
-Mean squared error between output and input spike rasters. The loss function for autoencoder training.
+## thx_train.rate_loss
 
-```python
-loss = thx_train.reconstruction_loss(
-    output: torch.Tensor,     # [batch, T, n_features]
-    target: torch.Tensor,     # [batch, T, n_features]
-    reduction: str = "mean",
-) -> torch.Tensor
-```
-
-Equivalent to `torch.nn.functional.mse_loss(output, target, reduction=reduction)`, provided here for consistency.
-
-## thx_train.accuracy
-
-Computes classification accuracy from a spike raster.
+Cross-entropy loss on mean firing rates. The canonical objective for THRINDEX classifiers.
 
 ```python
-acc = thx_train.accuracy(
-    spikes: torch.Tensor,     # [batch, T, n_classes]
-    targets: torch.Tensor,    # [batch], long
-) -> float
-```
-
-Returns the fraction of samples where the argmax of spike counts matches the target label.
-
-**Usage**
-
-```python
-with torch.no_grad():
-    out = model(x_val)
-    acc = thx_train.accuracy(out, y_val)
-    print(f"val_acc={acc:.4f}")
-```
-
-## thx_train.SpikeRegularizer
-
-A regularization term that penalizes high or low firing rates, preventing silent or saturated networks.
-
-```python
-reg = thx_train.SpikeRegularizer(
-    target_rate: float = 0.05,
-    weight: float = 1e-3,
-)
-
-loss = rate_loss(out, y) + reg(out)
+loss = thx_train.rate_loss(
+    spikes: torch.Tensor,   # [T, batch, n_classes]
+    labels: torch.Tensor,   # [batch], long
+) -> torch.Tensor            # scalar, differentiable
 ```
 
 **Parameters**
 
-| Name | Type | Default | Description |
-|---|---|---|---|
-| `target_rate` | `float` | `0.05` | Desired mean firing rate (fraction of T per neuron) |
-| `weight` | `float` | `1e-3` | Regularization coefficient |
+| Name | Type | Description |
+|---|---|---|
+| `spikes` | `Tensor[T, batch, n]` | Output spike raster from the model. Time-first. |
+| `labels` | `Tensor[batch]` | Integer class labels. |
 
 **Behavior**
 
-Penalizes the squared deviation of each neuron's mean firing rate from `target_rate`:
+Averages spike counts over the time dimension, then applies standard cross-entropy:
 
+```python
+mean_rates = spikes.mean(dim=0)   # [batch, n_classes]
+loss = F.cross_entropy(mean_rates, labels)
 ```
-reg_loss = weight × mean((rate[b, n] - target_rate)²)
+
+The output neurons compete to fire the most across the T timesteps. The neuron with the highest mean rate is the prediction. This is equivalent to treating mean rates as unnormalized logits.
+
+**Reference:** Eshraghian et al. (2023). "Training Spiking Neural Networks Using Lessons From Deep Learning." Proc. IEEE, 111(9), 1016-1054.
+
+---
+
+## thx_train.accuracy
+
+Classification accuracy from a spike raster.
+
+```python
+acc = thx_train.accuracy(
+    spikes: torch.Tensor,   # [T, batch, n_classes]
+    labels: torch.Tensor,   # [batch], long
+) -> float
 ```
 
-where `rate[b, n] = mean_t(spikes[b, t, n])`.
+Returns the fraction of samples where the argmax of mean firing rates matches the target label. Not differentiable - use `rate_loss` for the training objective.
 
-Typical values: `target_rate=0.05` (5% activity) with `weight=1e-3`. Increase `weight` if the network develops dead neurons or saturates.
+```python
+with torch.no_grad():
+    spikes = model(x_val)
+    acc = thx_train.accuracy(spikes, y_val)
+    print(f"val_acc={acc:.4f}")
+```
 
-## Delays are not an optimizer
+An empty batch returns `float("nan")`.
 
-`snn.Dense(..., delay=k)` is a fixed integer. Train the weights with Adam, or any other PyTorch optimizer, the same way as a layer with `delay=0`. There is no delay optimizer in this package. See [Synaptic Delays](/concepts/delays).
+---
+
+## thx_train.count_correct
+
+Integer count of correctly classified samples. Used internally by `accuracy`.
+
+```python
+n = thx_train.count_correct(
+    spikes: torch.Tensor,   # [T, batch, n_classes]
+    labels: torch.Tensor,   # [batch], long
+) -> int
+```
+
+The prediction for each sample is the output neuron with the highest mean firing rate over T.
