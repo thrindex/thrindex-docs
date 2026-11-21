@@ -1,89 +1,115 @@
 ---
 title: "Encoder"
-description: "How continuous values are converted into spike trains before entering the network."
+description: "Temporal binning and spike encoding - how T determines what your network can learn."
 ---
 
-The encoder sits between the raw dataset and the first layer of the network. It converts input values into binary spike trains of length **T** timesteps.
+The encoder sits between the raw dataset and the first layer of the network. It converts input data into binary spike trains of length **T** timesteps.
 
 Configure the encoder in the toolbar at the top of the **Network** view.
 
 ---
 
-## Encoder types
+## T - number of timesteps
 
-### Rate
+T is the single most important parameter in the encoder for spike datasets. It sets the temporal resolution of the input and directly determines the shape of every tensor in the network: `[T, features...]`.
 
-Each input value `v ∈ [0, 1]` is treated as a firing probability. At each of the T timesteps, a Bernoulli draw determines whether the neuron fires.
-
-```
-spike[t] = Bernoulli(v)   for t = 1 … T
-```
-
-The seed controls these random draws. The same seed always produces the same spike pattern for the same input.
-
-Rate coding is the default. It is appropriate when input values represent normalized activation levels or intensities.
-
-### Latency
-
-Each input value determines the first timestep at which the neuron fires. Larger values fire earlier; smaller values fire later or not at all within the T timesteps.
+For SHD recordings (~1.4 s), the bin duration is:
 
 ```
-t_fire = round((1 − v) * T)
-spike[t] = 1   if t == t_fire,  else 0
+bin_duration_ms = 1400 ms / T
 ```
 
-Latency coding encodes information in spike timing rather than spike count. It tends to produce sparse spike trains.
+| T | Bin duration | Character |
+|---|---|---|
+| 11 | 127 ms | Too coarse for SHD. Collapses most temporal structure. Loss stalls near chance. |
+| 25 | 56 ms | Still coarse. Network may learn but slowly. |
+| 100 | 14 ms | Standard. Matches roughly the temporal precision of biological auditory processing. |
+| 200 | 7 ms | Fine. Better temporal resolution, 2x the training time of T=100. |
+| 500 | 2.8 ms | Very fine. Useful for research on temporal coding limits. High compute cost. |
 
-### Delta
+**T = 100 is the recommended starting point for SHD.** The 14 ms bin duration is consistent with the timescales of cochlear spike patterns and what standard SNN classifiers in the literature use.
 
-The neuron fires at timestep `t` when the absolute change in value from `t−1` to `t` exceeds the threshold:
+**Training time scales linearly with T.** An epoch at T=200 takes roughly twice as long as T=100.
 
-```
-spike[t] = |v[t] − v[t−1]| > threshold
-```
-
-Delta coding is suited to time-series inputs where changes are more informative than absolute values.
-
-The **Threshold** field appears in the encoder toolbar only when **delta** is selected.
+For event-camera datasets (N-MNIST, DVS Gesture, CIFAR10-DVS), T determines how many temporal frames the DVS event stream is split into. Higher T means finer temporal resolution of the event flow.
 
 ---
 
-## T — number of timesteps
+## Spike datasets ignore the encoder type
 
-T controls the temporal resolution of the encoding. It directly determines the first dimension of every tensor in the network.
-
-For spike datasets, T is the number of bins the recording is divided into. SHD recordings are approximately 1.4 s long; at T = 100, each bin is 14 ms.
-
-Larger T preserves more temporal detail but increases training time proportionally.
-
----
-
-## Important: spike datasets ignore the encoder type
-
-For the four built-in spike datasets (SHD, N-MNIST, DVS Gesture, CIFAR10-DVS) and own-events NPY files, the input is already a binary spike recording. The encoder **type** (rate, latency, delta) has no effect. Only **T** applies: it sets how many timesteps each recording is binned into.
+For the four built-in spike datasets and own-events NPY files, the input is already a binary spike recording. The encoder **type** (rate, latency, delta) has no effect. Only T applies.
 
 The app shows a note below the encoder toolbar when a spike dataset is selected:
 
 > *This dataset is already spikes, so the type does not encode it again. T is how many bins each recording is divided into.*
 
-The encoder type only takes effect when the dataset is **Own values** — a file of continuous floating-point values that the encoder converts to spikes.
+Encoder type only affects **Own values** data - continuous-value inputs that the encoder converts into spikes.
+
+---
+
+## Encoder types (Own values only)
+
+### Rate
+
+Each value `v in [0, 1]` is used as a firing probability. At each timestep t, a Bernoulli draw determines whether the neuron fires:
+
+```
+spike[t] = Bernoulli(v)   for t = 1 to T
+```
+
+Expected firing rate = v. A value of 0.8 fires 80% of timesteps on average.
+
+Rate coding is insensitive to timing - information is carried by average firing rate, not by when spikes occur. It works well when input values represent intensities or probabilities and temporal order does not matter within a sample.
+
+### Latency
+
+Each value determines the first (and only) timestep at which the neuron fires. Larger values fire earlier:
+
+```
+t_fire = round((1 - v) * T)
+spike[t] = 1 if t == t_fire, else 0
+```
+
+Each neuron fires at most once per sample. This produces very sparse spike trains. Information is in spike timing: a neuron that fires at timestep 10 is encoding a larger value than one that fires at timestep 90.
+
+Latency coding is effective for inputs where relative ordering matters and you want energy-efficient inference (low total spike count).
+
+### Delta
+
+Fires when the absolute change in value from one timestep to the next exceeds the threshold:
+
+```
+spike[t] = |v[t] - v[t-1]| > threshold
+```
+
+This is a change detector, not a value encoder. It produces spikes only when the input is changing. Delta coding is well suited to time-series signals (sensor streams, electrophysiology recordings) where transitions carry more information than absolute value.
+
+The **Threshold** field appears in the encoder toolbar only when delta is selected.
 
 ---
 
 ## Seed
 
-The seed initializes three things:
+The seed controls three things:
 
-1. The random weight initialization for all Dense and Conv2d layers
-2. The epoch shuffle order (which samples the training loop sees first)
-3. The Bernoulli draws for rate encoding
+1. Random weight initialization for all Dense and Conv2d layers
+2. The epoch shuffle order (which samples the training loop sees and in what sequence)
+3. Bernoulli draws for rate encoding (own values only)
 
-Fixing the seed makes training reproducible. The seed is recorded in the run manifest so every run documents the exact initialization it used.
+Fixing the seed makes training fully reproducible. The same seed, architecture, and dataset always produce the same run. The seed is recorded in the run manifest alongside the full project snapshot.
+
+If two runs with the same architecture and seed produce different results, check whether the dataset loading or T setting changed.
 
 ---
 
-## dt
+## dt - simulation timestep
 
-The simulation timestep is fixed at **1 ms**. This determines the relationship between `tau_mem` in milliseconds and the dimensionless leak factor `alpha = exp(−1 / tau_mem)`.
+The simulation timestep is fixed at **1 ms**. This determines the relationship between `tau_mem` in milliseconds and the dimensionless leak factor:
 
-dt cannot be changed from the app. It appears as a read-only label in the encoder toolbar.
+```
+alpha = exp(-dt / tau_mem) = exp(-1 / tau_mem)
+```
+
+A `tau_mem` of 20 ms gives `alpha = 0.951`. Each timestep the membrane retains 95.1% of its previous value.
+
+dt cannot be changed from the app. It appears as a read-only label (`dt 1 ms`) in the encoder toolbar.

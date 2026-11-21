@@ -5,9 +5,9 @@ description: "Design your SNN architecture with the visual network editor."
 
 The Network view is the primary workspace. It has three panels:
 
-- **Left sidebar** — add layer types and manage the layer stack
-- **Center canvas** — live tensor shape diagram showing the full forward path
-- **Right panel** — layer inspector for editing parameters
+- **Left sidebar** - add layer types and manage the layer stack
+- **Center canvas** - live tensor shape diagram showing the full forward path
+- **Right panel** - layer inspector for editing parameters
 
 ---
 
@@ -17,7 +17,7 @@ The sidebar has two sections.
 
 **Add layer** lists the four available layer types: Dense, Conv2d, Flatten, and LIF. Click any type to append it to the bottom of the stack.
 
-**Stack** shows every layer in order, numbered from 1. Each row is draggable — grab the grip handle on the left to reorder layers. Click a row to select it and open the inspector on the right.
+**Stack** shows every layer in order, numbered from 1. Each row is draggable - grab the grip handle on the left to reorder layers. Click a row to select it and open the inspector on the right.
 
 You can select multiple layers: hold **Shift** and click to extend the selection from the anchor, or hold **Cmd** (Mac) to toggle individual layers. The last remaining layer cannot be deselected.
 
@@ -33,7 +33,7 @@ Each layer card shows:
 - The layer type (small, uppercase)
 - The key parameters (monospace, prominent)
 
-The tensor shape between each pair of layers is computed locally by the app — no worker call needed. If a shape is inconsistent (for example, a Dense layer whose `inFeatures` does not match the previous layer's output), the connection and the card turn red and an error message appears inline.
+The tensor shape between each pair of layers is computed locally by the app - no worker call needed. If a shape is inconsistent (for example, a Dense layer whose `inFeatures` does not match the previous layer's output), the connection and the card turn red and an error message appears inline.
 
 **Navigation:**
 - **Pinch** to zoom in and out (trackpad)
@@ -59,7 +59,7 @@ The encoder toolbar sits between the view header and the canvas. It configures h
 | **Threshold** | Only visible when Type is `delta`. The firing threshold for the delta encoder. |
 
 <Warning>
-For spike datasets (SHD, N-MNIST, DVS Gesture, CIFAR10-DVS), the **Type** field has no effect. These datasets are already spike recordings. Thrindex bins them into **T** timesteps — that is the only encoder parameter that applies.
+For spike datasets (SHD, N-MNIST, DVS Gesture, CIFAR10-DVS), the **Type** field has no effect. These datasets are already spike recordings. Thrindex bins them into **T** timesteps - that is the only encoder parameter that applies.
 </Warning>
 
 The note below the toolbar explains this when a spike dataset is selected.
@@ -85,9 +85,9 @@ Shape inference mirrors the THRINDEX SDK's `build_model` logic. It runs in the r
 
 The inspector appears on the right side of the Network view when a project is open.
 
-- **One layer selected** — shows all editable parameters for that layer type
-- **Multiple layers selected** — shows the count and a remove button
-- **No layer selected** — shows a prompt to select a layer
+- **One layer selected** - shows all editable parameters for that layer type
+- **Multiple layers selected** - shows the count and a remove button
+- **No layer selected** - shows a prompt to select a layer
 
 All fields commit on blur or Enter. Invalid values flash briefly then revert.
 

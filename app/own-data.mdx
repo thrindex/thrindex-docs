@@ -11,7 +11,7 @@ Both formats use NumPy `.npy` files stored in a directory on your machine. The d
 
 ## Own events
 
-Use this format when your data is already a spike recording — binary arrays of shape `[samples, T, N]` or `[samples, T, C, H, W]`.
+Use this format when your data is already a spike recording - binary arrays of shape `[samples, T, N]` or `[samples, T, C, H, W]`.
 
 ### Required files
 
@@ -40,7 +40,7 @@ The main panel shows which files were found. Files shown as missing will cause I
 
 Click **Import** to read one sample from your data and write a preview file. This does not change your original `.npy` files. The preview allows the app to show a spike raster visualization and verify the shapes before training.
 
-The encoder **type** has no effect on own-events data — it is already spikes. Only **T** in the encoder toolbar applies: it controls how many timesteps the recordings are divided into.
+The encoder **type** has no effect on own-events data - it is already spikes. Only **T** in the encoder toolbar applies: it controls how many timesteps the recordings are divided into.
 
 <Warning>
 Your `spikes_train.npy` must have the same T dimension as the encoder T setting, or training will fail. The shape shown in the preview reflects the actual T in your file.
@@ -50,7 +50,7 @@ Your `spikes_train.npy` must have the same T dimension as the encoder T setting,
 
 ## Own values
 
-Use this format when your data is continuous floating-point values — sensor readings, normalized activations, or any time-series measurements that you want to encode into spikes.
+Use this format when your data is continuous floating-point values - sensor readings, normalized activations, or any time-series measurements that you want to encode into spikes.
 
 ### Required files
 
@@ -73,9 +73,9 @@ Own values appear as a separate item in the dataset sidebar.
 
 For own-values data, the encoder **type** (rate, latency, delta) determines how values are converted to spikes at training time:
 
-- **Rate** — fires proportionally to the value at each timestep
-- **Latency** — fires earlier for larger values
-- **Delta** — fires when the value changes by more than the threshold
+- **Rate** - fires proportionally to the value at each timestep
+- **Latency** - fires earlier for larger values
+- **Delta** - fires when the value changes by more than the threshold
 
 Change the encoder type and threshold in the **Network** view encoder toolbar.
 

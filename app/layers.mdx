@@ -1,92 +1,134 @@
 ---
 title: "Layers"
-description: "Parameter reference for Dense, Conv2d, Flatten, and LIF."
+description: "Parameter reference and design guidance for Dense, LIF, Conv2d, and Flatten."
 ---
 
-Thrindex supports four layer types. They map directly to the corresponding types in `thrindex.snn` from the THRINDEX Python SDK. The compiled `.thx` artifact contains the resolved parameters.
+Thrindex supports four layer types. They map directly to the corresponding types in `thrindex.snn` from the THRINDEX SDK. The compiled `.thx` artifact contains the resolved parameters.
 
 ---
 
 ## Dense
 
-A fully connected linear layer, applied independently at each timestep.
+A fully connected linear layer, applied independently at each timestep. At each `t`, it computes:
+
+```
+y[t] = W * x[t] + b
+```
+
+If `delay > 0`, the input at timestep `t` is taken from `t - delay` (axonal delay model).
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| **In features** | int | — | Number of input features. Must match the output of the previous layer. |
-| **Out features** | int | — | Number of output features. |
-| **Delay (timesteps)** | int | `0` | Axonal delay in timesteps. `0` means no delay. |
+| **In features** | int | - | Number of input features. Must match the output dimension of the previous layer. |
+| **Out features** | int | - | Number of output features. |
+| **Delay (timesteps)** | int | `0` | Axonal delay. `0` means immediate. Each unit of delay shifts the input by 1 ms (since dt = 1 ms). |
 | **Bias** | bool | `true` | Whether to include a learnable bias term. |
 
-**Shape:** `[T, N_in] → [T, N_out]`
+**Shape:** `[T, N_in] -> [T, N_out]`
 
-If the previous layer has a 3D output (C × H × W), you must insert a **Flatten** layer before Dense. The shape diagram will show a red error if this rule is violated.
+**Delay:** axonal delays model the finite conduction time of biological axons. A delay of 2 means the Dense layer at timestep t receives the spikes that the previous layer emitted at t-2. For most classifiers on SHD, delay 0 is a good starting point. Delays are useful for circuits that explicitly exploit spike timing.
+
+If the previous layer outputs a 3D tensor (C x H x W), insert a **Flatten** layer before Dense. The shape diagram shows a red error if this rule is violated.
 
 ---
 
 ## LIF
 
-Leaky Integrate-and-Fire neuron. Applies at every timestep: accumulate input, leak, fire if above threshold, then reset.
+The Leaky Integrate-and-Fire neuron is the fundamental computational unit in this framework. It applies at every timestep.
 
-The leak is computed as:
-
+**Without synaptic filter (tau_syn empty):**
 ```
-alpha = exp(−dt / tau_mem)       # membrane leak factor
-u[t] = alpha * u[t−1] + x[t]    # update (subtract reset)
+alpha   = exp(-1 / tau_mem)         # membrane leak factor, dt = 1 ms
+u[t]    = alpha * u[t-1] + x[t]    # integrate
 spike[t] = u[t] >= threshold
-u[t] = u[t] − threshold * spike[t]   # reset: subtract
+u[t]    = u[t] - threshold * spike[t]   # reset: subtract
 ```
 
-With `reset = zero`, `u[t]` is set to 0 on a spike instead of subtracting the threshold.
-
-An optional synaptic filter runs before the membrane update when `tau_syn` is set:
-
+**With synaptic filter (tau_syn set):**
 ```
-beta = exp(−dt / tau_syn)
-s[t] = beta * s[t−1] + x[t]
-u[t] = alpha * u[t−1] + s[t]
+beta = exp(-1 / tau_syn)
+s[t] = beta * s[t-1] + x[t]        # synaptic current filter
+u[t] = alpha * u[t-1] + s[t]       # integrate filtered current
 ```
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | **Threshold** | float | `1.0` | Membrane potential at which the neuron fires. |
-| **tau_mem (ms)** | float | — | Membrane time constant. `alpha = exp(−1 / tau_mem)` with `dt = 1 ms`. |
+| **tau_mem (ms)** | float | - | Membrane time constant. Controls how fast the membrane leaks. |
 | **tau_syn (ms)** | float | *empty* | Synaptic filter time constant. Leave empty to skip the filter. |
-| **Reset** | `subtract` or `zero` | `subtract` | How the membrane potential is reset after a spike. `subtract` subtracts the threshold; `zero` resets to 0. |
-| **Surrogate slope** | float | `25` | Slope of the fast sigmoid surrogate gradient used during training. |
+| **Reset** | `subtract` or `zero` | `subtract` | How the membrane resets after a spike. |
+| **Surrogate slope** | float | `25` | Slope of the fast sigmoid surrogate used for backpropagation. |
 
-**Shape:** `[T, N] → [T, N]` — LIF does not change the feature dimension.
+**Shape:** `[T, N] -> [T, N]` - LIF does not change the feature dimension.
 
-<Tip>
-A second LIF with `threshold` set too high (e.g. `1.0` on a network whose Dense output is small) will stay silent. If your model converges but accuracy is at chance, check whether the output LIF is firing.
-</Tip>
+### Choosing tau_mem
+
+`tau_mem` controls the temporal integration window of the neuron. It is the RC time constant of the membrane: smaller values mean faster forgetting, larger values mean longer memory.
+
+| tau_mem | alpha (leak per ms) | Character |
+|---|---|---|
+| 5 ms | 0.819 | Fast. Neuron forgets input quickly. Good for high-frequency signals. |
+| 20 ms | 0.951 | Standard. Matches a typical cortical fast-spiking interneuron. Good starting point for SHD. |
+| 100 ms | 0.990 | Slow. Neuron integrates over long windows. Risk of saturation. |
+
+For SHD with T=100 (14 ms per bin), `tau_mem=20 ms` means the membrane retains roughly e^(-14/20) ≈ 0.50 of the previous state between consecutive bins. This is a reasonable integration window for the temporal structure of spoken digit recordings.
+
+### Choosing threshold
+
+The threshold sets the minimum integrated membrane potential required to fire. It interacts directly with the magnitude of the incoming Dense weights.
+
+**Common failure mode:** a threshold of `1.0` on the output LIF layer, combined with a hidden layer of e.g. 512 neurons and an output layer of 20 features, often results in a silent output layer. The 20-dimensional Dense output may never accumulate enough charge to reach 1.0. Use `threshold = 0.3` as a starting point for output LIF layers.
+
+For hidden LIF layers, `threshold = 0.3` with `tau_mem = 20` is a well-established starting point from the SHD literature (Cramer et al. 2020).
+
+### tau_syn - synaptic filter
+
+When set, `tau_syn` adds a low-pass filter on the input current before it reaches the membrane. This smooths rapid input fluctuations and can stabilize training, at the cost of one extra state variable per neuron.
+
+**When to use it:** tau_syn is beneficial when the input spikes are sparse and bursty - which is common in event-camera data (N-MNIST, DVS Gesture). For rate-coded inputs like SHD, the effect is smaller.
+
+Leave tau_syn empty to skip the filter entirely. The compiled artifact does not include the beta term when tau_syn is absent.
+
+### Reset: subtract vs zero
+
+**subtract** (default): `u = u - threshold` after a spike. The membrane retains the overshoot above the threshold, allowing rapid re-firing. This is the biologically motivated "subtraction reset" or "soft reset."
+
+**zero**: `u = 0` after a spike. Sharper reset, no memory of overshoot. Tends to produce more decorrelated spike trains. Some architectures train more stably with zero reset.
+
+### Surrogate slope
+
+The slope of the fast sigmoid determines how "wide" the gradient is around the threshold. A higher slope means a sharper, more accurate approximation of the true step function gradient but narrower effective gradient region.
+
+- `25` (default): standard across most SNN training literature
+- Lower values (5-10): smoother gradient, more neurons participate in the update per step, may help when neurons are rarely firing
+- Higher values (50+): sharper approximation, risk of vanishing gradients for neurons far from threshold
 
 ---
 
 ## Conv2d
 
-A spatial convolution applied frame-by-frame. Use after a 3D event-camera input or after another Conv2d.
+A spatial convolution applied frame-by-frame at each timestep. Use this after a 3D event-camera input or after another Conv2d layer.
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| **In channels** | int | — | Number of input channels (polarities for event-camera data). |
-| **Out channels** | int | — | Number of output feature maps. |
-| **Kernel** | int | — | Kernel size (square). |
+| **In channels** | int | - | Input channels. 2 for DVS (ON and OFF polarity). |
+| **Out channels** | int | - | Output feature maps. |
+| **Kernel** | int | - | Kernel size (square). |
 | **Stride** | int | `1` | Convolution stride. |
 | **Padding** | int | `0` | Zero-padding on each spatial edge. |
 | **Dilation** | int | `1` | Kernel element spacing. |
-| **Groups** | int | `1` | Channel grouping for grouped convolution. |
-| **Input height** | int | — | Spatial height of the input frame. Required on the first Conv2d in the stack. |
-| **Input width** | int | — | Spatial width of the input frame. |
-| **Bias** | bool | `true` | Whether to include a learnable bias. |
+| **Groups** | int | `1` | Channel grouping for grouped or depthwise convolution. |
+| **Input height** | int | - | Spatial height. Required on the first Conv2d. |
+| **Input width** | int | - | Spatial width. Required on the first Conv2d. |
+| **Bias** | bool | `true` | Learnable bias. |
 
-**Shape:** `[T, C_in, H, W] → [T, C_out, H_out, W_out]`
-
-Output height and width follow the standard formula:
+**Shape:** `[T, C_in, H, W] -> [T, C_out, H_out, W_out]`
 
 ```
-H_out = floor((H + 2*padding − dilation*(kernel−1) − 1) / stride + 1)
+H_out = floor((H + 2*padding - dilation*(kernel-1) - 1) / stride + 1)
 ```
+
+**Input channels for DVS datasets:** N-MNIST, DVS Gesture, and CIFAR10-DVS have 2 channels - one for ON events (brightness increases) and one for OFF events (brightness decreases). Set `In channels = 2` for the first Conv2d.
 
 ---
 
@@ -96,17 +138,19 @@ Collapses the spatial dimensions of a 3D tensor into a single feature vector. No
 
 Insert Flatten between a Conv2d layer and a Dense layer.
 
-**Shape:** `[T, C, H, W] → [T, C * H * W]`
+**Shape:** `[T, C, H, W] -> [T, C * H * W]`
+
+For large spatial inputs (DVS Gesture, CIFAR10-DVS at 128x128), the flattened dimension is 2 x 128 x 128 = 32768. This is a large Dense input - consider using multiple Conv2d + LIF pairs to reduce spatial resolution before Flatten.
 
 ---
 
 ## Layer order rules
 
-The shape diagram enforces these constraints:
+The shape diagram enforces these constraints live:
 
-- **Dense after 3D input** requires a Flatten in between.
-- **Dense inFeatures** must equal the previous layer's output features.
-- **Conv2d** expects a 3D input. It cannot directly follow a Dense.
-- **LIF** passes through whatever shape it receives unchanged.
+- **Dense after 3D input** requires a Flatten in between
+- **Dense inFeatures** must equal the previous layer's output features
+- **Conv2d** expects a 3D input - it cannot directly follow a Dense layer
+- **LIF** passes through whatever shape it receives unchanged
 
-Violations are shown as red cards and inline error text. Training is not blocked by shape errors, but the Python worker will refuse to build the model and return an error when you press Train.
+Violations show as red cards with an inline error message. Training with shape errors will fail when the worker tries to build the model.

@@ -1,6 +1,6 @@
 ---
 title: "Data"
-description: "Built-in spike datasets and how to install them."
+description: "Built-in spike datasets, what they represent, and how to install them."
 ---
 
 The **Data** view manages the dataset for the current project. Select a dataset in the left sidebar; install it with the button in the main panel. Selecting a dataset does not download anything.
@@ -9,64 +9,92 @@ The **Data** view manages the dataset for the current project. Select a dataset 
 
 ## Built-in datasets
 
-### SHD — Spiking Heidelberg Digits
+### SHD - Spiking Heidelberg Digits
 
-Cochlear spike recordings of spoken digits (German and English). The standard benchmark for temporal SNN classifiers.
+Cochlear spike recordings of spoken digits. The standard temporal classification benchmark for SNN research.
 
 | Property | Value |
 |---|---|
-| Input shape | `[T, 700]` — 700 cochlear channels |
-| Classes | 20 (zero–nine in English and German) |
+| Input shape | `[T, 700]` - 700 cochlear channels |
+| Classes | 20 (zero through nine in English and German) |
 | Splits | Train and test |
-| Recording duration | ~1.4 s |
-| Download | Train 130 MB · Test 38 MB |
+| Recording duration | ~1.4 s per sample |
+| Download | Train 130 MB, Test 38 MB |
 | Reference | Cramer et al., 2020 |
 
-<Tip>
-Start with T = 100 for SHD. Each bin is 14 ms. T = 11 collapses too much temporal structure for a classifier to learn from.
-</Tip>
+**What the input represents:** SHD uses a computational model of the human cochlea to convert audio recordings of spoken digits into spike trains. The 700 channels correspond to frequency bands along the basilar membrane - low-frequency bands at high indices, high-frequency bands at low indices. Each channel fires when sound energy is detected in that frequency band.
+
+This input is fundamentally temporal: a spoken digit "three" in English and "drei" in German can have similar cochlear frequency profiles but different temporal patterns. The network must use temporal integration (tau_mem, T) to distinguish them.
+
+**Recommended T:** 100. At T=100, each bin is 14 ms - coarse enough to keep training fast, fine enough to capture the temporal structure of cochlear spike patterns. Published results (Cramer et al., ~48% held-out; Zenke and Neftci) use T=100.
+
+<Warning>
+Using T=11 or similar small values collapses too much temporal structure. Each 1.4 s recording becomes 11 bins of 127 ms. The cochlear pattern of "one" and "nine" become indistinguishable at this resolution. Training accuracy will stall near chance (5% for 20 classes) regardless of architecture.
+</Warning>
 
 ---
 
 ### N-MNIST
 
-The MNIST digit benchmark recorded using a DVS event camera performing three saccadic eye movements.
+The MNIST digit benchmark recorded using a DVS (Dynamic Vision Sensor) event camera. The camera performs three saccadic movements across printed digit images, generating an event stream from the resulting apparent motion.
 
 | Property | Value |
 |---|---|
-| Input shape | `[T, 2, 34, 34]` — 2 polarities, 34 × 34 pixels |
-| Classes | 10 (digits 0–9) |
+| Input shape | `[T, 2, 34, 34]` - 2 polarities, 34x34 pixels |
+| Classes | 10 (digits 0-9) |
 | Splits | Train and test |
-| Download | Train 1.0 GB · Test 170 MB |
+| Download | Train 1.0 GB, Test 170 MB |
 | Reference | Orchard et al., 2015 |
+
+**What the input represents:** A DVS camera fires an event when a pixel detects a brightness change, with polarity indicating direction (increase or decrease). Channel 0 is ON events (brightness increases); channel 1 is OFF events (brightness decreases). The spatial 34x34 grid is the DVS pixel array.
+
+N-MNIST is a spatial task more than a temporal one - the three saccades generate repeated exposures to the digit edge pattern. A Conv2d-based encoder followed by LIF is natural here, as the network needs to detect spatial features (edges, curves) across the DVS frame.
 
 ---
 
 ### DVS Gesture
 
-Hand and arm gestures recorded on a DVS event camera under varying lighting conditions.
+Hand and arm gestures recorded on a DVS camera under varying lighting conditions. Each class is a distinct movement type.
 
 | Property | Value |
 |---|---|
-| Input shape | `[T, 2, 128, 128]` — 2 polarities, 128 × 128 pixels |
-| Classes | 11 (clapping, waves, arm rolls, air drums, air guitar, other) |
+| Input shape | `[T, 2, 128, 128]` - 2 polarities, 128x128 pixels |
+| Classes | 11 (clapping, right wave, left wave, arm rotations, air drums, air guitar, other) |
 | Splits | Train and test |
-| Download | Train 2.4 GB · Test 691 MB |
+| Download | Train 2.4 GB, Test 691 MB |
 | Reference | Amir et al., 2017 |
+
+**What the input represents:** Same DVS polarity model as N-MNIST, but at higher spatial resolution (128x128) and with gestural rather than object-recognition content. The temporal dimension carries significant information: the difference between "air drums" and "air guitar" is in the motion trajectory, not in a single frame.
+
+A Conv2d stack is natural for DVS Gesture - the 32768-dimensional flattened input (2x128x128) is too large to pass directly to Dense. Use Conv2d + LIF pairs to reduce spatial resolution before Flatten + Dense.
 
 ---
 
 ### CIFAR10-DVS
 
-The CIFAR-10 image dataset recorded on a DVS camera. Includes all 10 original classes.
+The CIFAR-10 image dataset converted to DVS events by playing the images on a monitor and recording with a DVS camera.
 
 | Property | Value |
 |---|---|
-| Input shape | `[T, 2, 128, 128]` — 2 polarities, 128 × 128 pixels |
+| Input shape | `[T, 2, 128, 128]` - 2 polarities, 128x128 pixels |
 | Classes | 10 (airplane, automobile, bird, cat, deer, dog, frog, horse, ship, truck) |
 | Splits | All (not pre-split) |
 | Download | 11.2 GB |
 | Reference | Li et al., 2017 |
+
+**Note:** CIFAR10-DVS is not pre-split into train and test. Held-out accuracy will not be reported since the app trains on the full set. This dataset is 11 GB and will take significant time to download and train on.
+
+---
+
+## Dataset selection guidance
+
+| Task | Dataset |
+|---|---|
+| Temporal SNN classification benchmark | SHD |
+| Spatial event-camera classification | N-MNIST (compact), DVS Gesture (harder) |
+| Replicating published results | SHD (most SNN papers use it) |
+| Testing Conv2d architectures | N-MNIST or DVS Gesture |
+| Your own neuromorphic sensor data | Own events (see [Own Data](/app/own-data)) |
 
 ---
 
@@ -74,28 +102,30 @@ The CIFAR-10 image dataset recorded on a DVS camera. Includes all 10 original cl
 
 After selecting a dataset in the sidebar, the main panel shows the dataset details and an **Install** button.
 
-Clicking **Install** downloads the dataset to the Thrindex cache directory on your machine (`~/Library/Caches/thrindex/` on Mac). This directory is shared across all projects.
+Clicking **Install** downloads the dataset to `~/Library/Caches/thrindex/` on your Mac. This cache is shared across all projects - you only download each dataset once.
 
-A progress bar shows download phase and bytes received. Installation can be interrupted with **Stop install**; the download resumes where it left off when you Install again.
+Installation can be interrupted with **Stop install**. The download resumes where it left off when you Install again.
 
-Once installed, the dataset status row shows **installed** in the sidebar and the **Train** button becomes available.
+Once installed, the sidebar shows **installed** next to the dataset name and the **Train** button becomes available.
 
 <Note>
-The dataset is cached on your machine, not inside the project folder. Moving or deleting the project folder does not affect installed datasets.
+The dataset cache is on your machine, not inside the project folder. Moving or deleting the project folder does not affect installed datasets.
 </Note>
 
 ---
 
 ## Dataset preview
 
-After installation, the main panel shows a spike raster visualization: one sample recording from the training split, encoded at the current **T** value.
+After installation, the main panel shows a spike raster visualization: one sample from the training split, encoded at the current **T** value.
 
-The raster updates when T changes. This is a quick visual sanity check — you can see whether the temporal resolution captures the structure of the input.
+For 1D data (SHD), the raster shows channel (y-axis) vs timestep (x-axis). Each dot is a spike. A well-structured SHD sample shows sparse, non-uniform spike patterns - dense at some frequencies and timesteps, empty at others. If the raster looks uniformly dense or completely empty, check T.
 
-For 3D (event-camera) datasets, the raster is a frame-by-frame overlay of ON and OFF events across the spatial grid.
+For 3D event-camera data, the raster is a frame-by-frame overlay of ON and OFF events across the spatial grid.
+
+The raster updates when you change T. Watching it change as you adjust T is the fastest way to understand what temporal resolution looks like for your data.
 
 ---
 
 ## Reinstalling
 
-If a dataset download is corrupted or incomplete, click **Reinstall** (shown when the dataset is already marked installed). This re-downloads and re-verifies all files.
+If a dataset download is corrupted or incomplete, click **Reinstall** to re-download and re-verify all files.

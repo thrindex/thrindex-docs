@@ -11,8 +11,8 @@ Click **Compute** in the top bar to open the Compute settings dialog.
 
 The **Hardware** row shows which device the Python worker detected at startup:
 
-- **Apple GPU** — Metal Performance Shaders backend. Available on Apple Silicon Macs.
-- **CPU** — Used when no GPU is detected.
+- **Apple GPU** - Metal Performance Shaders backend. Available on Apple Silicon Macs.
+- **CPU** - Used when no GPU is detected.
 
 Detection runs once when the app starts. The app probes MPS first, then CPU.
 
@@ -22,7 +22,7 @@ Detection runs once when the app starts. The app probes MPS first, then CPU.
 
 | Option | Behavior |
 |---|---|
-| **Auto** | Use the best available device at startup — Apple GPU if available, otherwise CPU. |
+| **Auto** | Use the best available device at startup - Apple GPU if available, otherwise CPU. |
 | **CPU only** | Force every training run to use CPU, regardless of what hardware is attached. |
 
 Changing this setting takes effect on the next training run. The current run (if one is in progress) continues on its original device.
@@ -41,7 +41,7 @@ Controls the maximum number of CPU cores PyTorch may use.
 Lowering this setting keeps other apps responsive during long training jobs. It trades training time for system responsiveness.
 
 <Tip>
-If the machine becomes slow while training, set CPU threads to `4` or `2`. On Apple Silicon, most of the training work runs on the GPU anyway — the CPU thread cap mainly affects data loading.
+If the machine becomes slow while training, set CPU threads to `4` or `2`. On Apple Silicon, most of the training work runs on the GPU anyway - the CPU thread cap mainly affects data loading.
 </Tip>
 
 CPU thread changes apply on the next training run. The current run uses the thread count it started with.
@@ -55,7 +55,7 @@ CPU thread changes apply on the next training run. The current run uses the thre
 | **Normal** | Operating system default. The training process competes normally for resources. |
 | **Background** | The training process runs at lower priority. Other apps remain responsive. |
 
-Priority changes apply immediately when changed — Thrindex renices the worker process without restarting it.
+Priority changes apply immediately when changed - Thrindex renices the worker process without restarting it.
 
 ---
 
