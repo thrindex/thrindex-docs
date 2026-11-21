@@ -1,0 +1,101 @@
+---
+title: "Data"
+description: "Built-in spike datasets and how to install them."
+---
+
+The **Data** view manages the dataset for the current project. Select a dataset in the left sidebar; install it with the button in the main panel. Selecting a dataset does not download anything.
+
+---
+
+## Built-in datasets
+
+### SHD — Spiking Heidelberg Digits
+
+Cochlear spike recordings of spoken digits (German and English). The standard benchmark for temporal SNN classifiers.
+
+| Property | Value |
+|---|---|
+| Input shape | `[T, 700]` — 700 cochlear channels |
+| Classes | 20 (zero–nine in English and German) |
+| Splits | Train and test |
+| Recording duration | ~1.4 s |
+| Download | Train 130 MB · Test 38 MB |
+| Reference | Cramer et al., 2020 |
+
+<Tip>
+Start with T = 100 for SHD. Each bin is 14 ms. T = 11 collapses too much temporal structure for a classifier to learn from.
+</Tip>
+
+---
+
+### N-MNIST
+
+The MNIST digit benchmark recorded using a DVS event camera performing three saccadic eye movements.
+
+| Property | Value |
+|---|---|
+| Input shape | `[T, 2, 34, 34]` — 2 polarities, 34 × 34 pixels |
+| Classes | 10 (digits 0–9) |
+| Splits | Train and test |
+| Download | Train 1.0 GB · Test 170 MB |
+| Reference | Orchard et al., 2015 |
+
+---
+
+### DVS Gesture
+
+Hand and arm gestures recorded on a DVS event camera under varying lighting conditions.
+
+| Property | Value |
+|---|---|
+| Input shape | `[T, 2, 128, 128]` — 2 polarities, 128 × 128 pixels |
+| Classes | 11 (clapping, waves, arm rolls, air drums, air guitar, other) |
+| Splits | Train and test |
+| Download | Train 2.4 GB · Test 691 MB |
+| Reference | Amir et al., 2017 |
+
+---
+
+### CIFAR10-DVS
+
+The CIFAR-10 image dataset recorded on a DVS camera. Includes all 10 original classes.
+
+| Property | Value |
+|---|---|
+| Input shape | `[T, 2, 128, 128]` — 2 polarities, 128 × 128 pixels |
+| Classes | 10 (airplane, automobile, bird, cat, deer, dog, frog, horse, ship, truck) |
+| Splits | All (not pre-split) |
+| Download | 11.2 GB |
+| Reference | Li et al., 2017 |
+
+---
+
+## Installing a dataset
+
+After selecting a dataset in the sidebar, the main panel shows the dataset details and an **Install** button.
+
+Clicking **Install** downloads the dataset to the Thrindex cache directory on your machine (`~/Library/Caches/thrindex/` on Mac). This directory is shared across all projects.
+
+A progress bar shows download phase and bytes received. Installation can be interrupted with **Stop install**; the download resumes where it left off when you Install again.
+
+Once installed, the dataset status row shows **installed** in the sidebar and the **Train** button becomes available.
+
+<Note>
+The dataset is cached on your machine, not inside the project folder. Moving or deleting the project folder does not affect installed datasets.
+</Note>
+
+---
+
+## Dataset preview
+
+After installation, the main panel shows a spike raster visualization: one sample recording from the training split, encoded at the current **T** value.
+
+The raster updates when T changes. This is a quick visual sanity check — you can see whether the temporal resolution captures the structure of the input.
+
+For 3D (event-camera) datasets, the raster is a frame-by-frame overlay of ON and OFF events across the spatial grid.
+
+---
+
+## Reinstalling
+
+If a dataset download is corrupted or incomplete, click **Reinstall** (shown when the dataset is already marked installed). This re-downloads and re-verifies all files.

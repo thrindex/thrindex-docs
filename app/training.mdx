@@ -1,0 +1,112 @@
+---
+title: "Training"
+description: "Training settings, live metrics, and what to watch for."
+---
+
+## Before you train
+
+The **Train** button is blocked until all prerequisites are met. The left sidebar shows the reason when training cannot start:
+
+| Reason shown | What to do |
+|---|---|
+| Sign in to train | Click the account avatar and sign in |
+| Choose a dataset first | Switch to Data and select a dataset |
+| Install this dataset on the Data page first | Switch to Data and click Install |
+| Add at least one layer first | Switch to Network and add layers |
+| A run is already in progress | Wait for the current run to finish, or stop it |
+
+---
+
+## Training settings
+
+Configure training in the **Train** sidebar.
+
+| Setting | Default | Description |
+|---|---|---|
+| **Learning rate** | `0.001` | Step size for Adam. Values between `0.0003` and `0.003` are typical for SNN classifiers. |
+| **Batch size** | `32` | Samples per gradient step. Larger batches use more memory. `32` fits comfortably on Apple Silicon. |
+| **Epochs** | `30` | Number of full passes through the training set. |
+
+**Fixed settings** (not configurable):
+
+| Setting | Value |
+|---|---|
+| Loss function | Rate loss (sum of output spike counts, cross-entropy formulation) |
+| Optimizer | Adam |
+| Gradient clip | 5.0 (global norm) |
+
+---
+
+## Starting and stopping a run
+
+Click **Train** to start. The worker launches the Python backend if it is not running, loads the dataset, builds the model from the current layer stack, and begins training.
+
+The epoch counter and device label appear in the status bar at the bottom of the window while training is running. Each epoch appends a row to the main panel charts.
+
+**To stop a run before it finishes:**
+
+Click **Cancel** in the status bar. A confirmation dialog appears:
+
+> *Stop this run?*
+> *The run stops between batches. Epochs already written stay in the run folder.*
+
+Stopping between batches means the current epoch may not appear in the metrics if it was interrupted mid-epoch. All completed epochs are preserved and readable in the **Runs** view.
+
+<Note>
+Edits to the layer stack during training are saved to `project.json` immediately, but they do not affect the running job. The next training run will use the updated stack.
+</Note>
+
+---
+
+## Live metrics
+
+The **Train** view main panel streams metrics as each epoch completes.
+
+**Epoch summary (top panel):**
+
+| Field | Description |
+|---|---|
+| Loss | Cross-entropy loss on the training set for this epoch |
+| Training accuracy | Fraction of training samples correctly classified |
+| Held-out accuracy | Fraction of test samples correctly classified (shown when a test split exists) |
+
+**Charts:**
+
+- **Accuracy** — training accuracy per epoch (and held-out accuracy if available)
+- **Loss** — training loss per epoch
+
+The charts reset when a new run starts.
+
+The header bar shows the current epoch count and the run ID (`Nov 17 · 19:05`) when at least one epoch has completed.
+
+---
+
+## Reading the metrics
+
+**Loss** should decrease over epochs. A loss that stays flat from epoch 1 usually means:
+- Learning rate is too high or too low
+- The output LIF layer is silent (threshold too high)
+- The network architecture has shape errors
+
+**Training accuracy vs held-out accuracy:**
+- If training accuracy rises but held-out accuracy does not, the model is overfitting
+- If both are stuck near chance (e.g. 5% for a 20-class problem), the network is not learning at all — check T, threshold, and learning rate
+
+---
+
+## Hardware and device
+
+The **Train** view shows which device is active:
+
+- **Apple GPU** — Metal Performance Shaders (MPS). Used automatically on Apple Silicon when the Compute setting is on Auto.
+- **CPU** — Used when no GPU is available, or when you have forced CPU-only in Compute settings.
+
+The status bar shows the device alongside the epoch counter while training.
+
+If the Compute setting is set to **CPU only**, this is noted with "Settings forces CPU" in the Train view header.
+
+<Tip>
+Training on Apple GPU is typically 3–5× faster than CPU on Apple Silicon. Keep the Compute setting on Auto unless you have a specific reason to use CPU only.
+</Tip>
+
+For memory and performance settings, see [Compute](/app/compute).

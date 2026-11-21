@@ -1,0 +1,68 @@
+---
+title: "Compute Settings"
+description: "Configure which hardware Thrindex uses and how it shares your machine's resources."
+---
+
+Click **Compute** in the top bar to open the Compute settings dialog.
+
+---
+
+## Hardware
+
+The **Hardware** row shows which device the Python worker detected at startup:
+
+- **Apple GPU** — Metal Performance Shaders backend. Available on Apple Silicon Macs.
+- **CPU** — Used when no GPU is detected.
+
+Detection runs once when the app starts. The app probes MPS first, then CPU.
+
+---
+
+## Device
+
+| Option | Behavior |
+|---|---|
+| **Auto** | Use the best available device at startup — Apple GPU if available, otherwise CPU. |
+| **CPU only** | Force every training run to use CPU, regardless of what hardware is attached. |
+
+Changing this setting takes effect on the next training run. The current run (if one is in progress) continues on its original device.
+
+---
+
+## CPU threads
+
+Controls the maximum number of CPU cores PyTorch may use.
+
+| Setting | Behavior |
+|---|---|
+| **All cores** | PyTorch decides (default). Uses as many threads as it wants. |
+| `1`, `2`, `4`, `8` | Hard cap. Keeps training from saturating all cores. |
+
+Lowering this setting keeps other apps responsive during long training jobs. It trades training time for system responsiveness.
+
+<Tip>
+If the machine becomes slow while training, set CPU threads to `4` or `2`. On Apple Silicon, most of the training work runs on the GPU anyway — the CPU thread cap mainly affects data loading.
+</Tip>
+
+CPU thread changes apply on the next training run. The current run uses the thread count it started with.
+
+---
+
+## Priority
+
+| Setting | Behavior |
+|---|---|
+| **Normal** | Operating system default. The training process competes normally for resources. |
+| **Background** | The training process runs at lower priority. Other apps remain responsive. |
+
+Priority changes apply immediately when changed — Thrindex renices the worker process without restarting it.
+
+---
+
+## When to change these settings
+
+For most research use, **Auto** device, **All cores**, and **Normal** priority produce the fastest training runs. Consider adjusting when:
+
+- You need to use the machine for other work during a long run → **Background** priority and a **CPU thread cap**
+- You want reproducible CPU-only results (e.g., for a benchmark that specifies CPU) → **CPU only**
+

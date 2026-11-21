@@ -1,0 +1,112 @@
+---
+title: "Layers"
+description: "Parameter reference for Dense, Conv2d, Flatten, and LIF."
+---
+
+Thrindex supports four layer types. They map directly to the corresponding types in `thrindex.snn` from the THRINDEX Python SDK. The compiled `.thx` artifact contains the resolved parameters.
+
+---
+
+## Dense
+
+A fully connected linear layer, applied independently at each timestep.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| **In features** | int | — | Number of input features. Must match the output of the previous layer. |
+| **Out features** | int | — | Number of output features. |
+| **Delay (timesteps)** | int | `0` | Axonal delay in timesteps. `0` means no delay. |
+| **Bias** | bool | `true` | Whether to include a learnable bias term. |
+
+**Shape:** `[T, N_in] → [T, N_out]`
+
+If the previous layer has a 3D output (C × H × W), you must insert a **Flatten** layer before Dense. The shape diagram will show a red error if this rule is violated.
+
+---
+
+## LIF
+
+Leaky Integrate-and-Fire neuron. Applies at every timestep: accumulate input, leak, fire if above threshold, then reset.
+
+The leak is computed as:
+
+```
+alpha = exp(−dt / tau_mem)       # membrane leak factor
+u[t] = alpha * u[t−1] + x[t]    # update (subtract reset)
+spike[t] = u[t] >= threshold
+u[t] = u[t] − threshold * spike[t]   # reset: subtract
+```
+
+With `reset = zero`, `u[t]` is set to 0 on a spike instead of subtracting the threshold.
+
+An optional synaptic filter runs before the membrane update when `tau_syn` is set:
+
+```
+beta = exp(−dt / tau_syn)
+s[t] = beta * s[t−1] + x[t]
+u[t] = alpha * u[t−1] + s[t]
+```
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| **Threshold** | float | `1.0` | Membrane potential at which the neuron fires. |
+| **tau_mem (ms)** | float | — | Membrane time constant. `alpha = exp(−1 / tau_mem)` with `dt = 1 ms`. |
+| **tau_syn (ms)** | float | *empty* | Synaptic filter time constant. Leave empty to skip the filter. |
+| **Reset** | `subtract` or `zero` | `subtract` | How the membrane potential is reset after a spike. `subtract` subtracts the threshold; `zero` resets to 0. |
+| **Surrogate slope** | float | `25` | Slope of the fast sigmoid surrogate gradient used during training. |
+
+**Shape:** `[T, N] → [T, N]` — LIF does not change the feature dimension.
+
+<Tip>
+A second LIF with `threshold` set too high (e.g. `1.0` on a network whose Dense output is small) will stay silent. If your model converges but accuracy is at chance, check whether the output LIF is firing.
+</Tip>
+
+---
+
+## Conv2d
+
+A spatial convolution applied frame-by-frame. Use after a 3D event-camera input or after another Conv2d.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| **In channels** | int | — | Number of input channels (polarities for event-camera data). |
+| **Out channels** | int | — | Number of output feature maps. |
+| **Kernel** | int | — | Kernel size (square). |
+| **Stride** | int | `1` | Convolution stride. |
+| **Padding** | int | `0` | Zero-padding on each spatial edge. |
+| **Dilation** | int | `1` | Kernel element spacing. |
+| **Groups** | int | `1` | Channel grouping for grouped convolution. |
+| **Input height** | int | — | Spatial height of the input frame. Required on the first Conv2d in the stack. |
+| **Input width** | int | — | Spatial width of the input frame. |
+| **Bias** | bool | `true` | Whether to include a learnable bias. |
+
+**Shape:** `[T, C_in, H, W] → [T, C_out, H_out, W_out]`
+
+Output height and width follow the standard formula:
+
+```
+H_out = floor((H + 2*padding − dilation*(kernel−1) − 1) / stride + 1)
+```
+
+---
+
+## Flatten
+
+Collapses the spatial dimensions of a 3D tensor into a single feature vector. No learnable parameters.
+
+Insert Flatten between a Conv2d layer and a Dense layer.
+
+**Shape:** `[T, C, H, W] → [T, C * H * W]`
+
+---
+
+## Layer order rules
+
+The shape diagram enforces these constraints:
+
+- **Dense after 3D input** requires a Flatten in between.
+- **Dense inFeatures** must equal the previous layer's output features.
+- **Conv2d** expects a 3D input. It cannot directly follow a Dense.
+- **LIF** passes through whatever shape it receives unchanged.
+
+Violations are shown as red cards and inline error text. Training is not blocked by shape errors, but the Python worker will refuse to build the model and return an error when you press Train.

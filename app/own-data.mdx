@@ -1,0 +1,88 @@
+---
+title: "Own Data"
+description: "Using your own spike recordings or value arrays for training."
+---
+
+Thrindex supports two formats for custom datasets: **own events** (pre-recorded spike data) and **own values** (continuous-value arrays that the encoder converts to spikes).
+
+Both formats use NumPy `.npy` files stored in a directory on your machine. The directory is set once per project and remembered.
+
+---
+
+## Own events
+
+Use this format when your data is already a spike recording — binary arrays of shape `[samples, T, N]` or `[samples, T, C, H, W]`.
+
+### Required files
+
+Place these four `.npy` files in one directory:
+
+| File | Shape | Description |
+|---|---|---|
+| `spikes_train.npy` | `[N_train, T, features...]` | Training spike recordings |
+| `labels_train.npy` | `[N_train]` | Integer class labels for training |
+| `spikes_test.npy` | `[N_test, T, features...]` | Test spike recordings |
+| `labels_test.npy` | `[N_test]` | Integer class labels for test |
+
+If you only have training data (no held-out split), you can omit `spikes_test.npy` and `labels_test.npy`. The train view will not show held-out accuracy.
+
+### Setting up
+
+1. Switch to the **Data** view.
+2. Click the **folder icon** (top right of the sidebar, next to the Datasets header) to open a folder picker.
+3. Select the directory that contains your `.npy` files.
+
+The sidebar shows the folder name as a dataset option. Select it to make it active.
+
+The main panel shows which files were found. Files shown as missing will cause Install to fail.
+
+### Importing (binning a sample)
+
+Click **Import** to read one sample from your data and write a preview file. This does not change your original `.npy` files. The preview allows the app to show a spike raster visualization and verify the shapes before training.
+
+The encoder **type** has no effect on own-events data — it is already spikes. Only **T** in the encoder toolbar applies: it controls how many timesteps the recordings are divided into.
+
+<Warning>
+Your `spikes_train.npy` must have the same T dimension as the encoder T setting, or training will fail. The shape shown in the preview reflects the actual T in your file.
+</Warning>
+
+---
+
+## Own values
+
+Use this format when your data is continuous floating-point values — sensor readings, normalized activations, or any time-series measurements that you want to encode into spikes.
+
+### Required files
+
+| File | Shape | Description |
+|---|---|---|
+| `values_train.npy` | `[N_train, T, features]` | Training value recordings |
+| `labels_train.npy` | `[N_train]` | Integer class labels for training |
+| `values_test.npy` | `[N_test, T, features]` | Test value recordings |
+| `labels_test.npy` | `[N_test]` | Integer class labels for test |
+
+### Setting up
+
+1. Switch to the **Data** view.
+2. Click the **folder icon** in the sidebar to choose a values folder.
+3. Select your directory.
+
+Own values appear as a separate item in the dataset sidebar.
+
+### Encoder type applies here
+
+For own-values data, the encoder **type** (rate, latency, delta) determines how values are converted to spikes at training time:
+
+- **Rate** — fires proportionally to the value at each timestep
+- **Latency** — fires earlier for larger values
+- **Delta** — fires when the value changes by more than the threshold
+
+Change the encoder type and threshold in the **Network** view encoder toolbar.
+
+---
+
+## Network input shape
+
+For own events, the first Dense or Conv2d layer must match the actual shape of your recordings. The shape diagram shows "unknown" for own-data inputs until you run Import; after that it reflects the actual dimensions read from your files.
+
+For own values, the shape is `[T, features]` where `features` is the last dimension of your `values_train.npy`.

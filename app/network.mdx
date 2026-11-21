@@ -1,0 +1,96 @@
+---
+title: "Network View"
+description: "Design your SNN architecture with the visual network editor."
+---
+
+The Network view is the primary workspace. It has three panels:
+
+- **Left sidebar** — add layer types and manage the layer stack
+- **Center canvas** — live tensor shape diagram showing the full forward path
+- **Right panel** — layer inspector for editing parameters
+
+---
+
+## Left sidebar
+
+The sidebar has two sections.
+
+**Add layer** lists the four available layer types: Dense, Conv2d, Flatten, and LIF. Click any type to append it to the bottom of the stack.
+
+**Stack** shows every layer in order, numbered from 1. Each row is draggable — grab the grip handle on the left to reorder layers. Click a row to select it and open the inspector on the right.
+
+You can select multiple layers: hold **Shift** and click to extend the selection from the anchor, or hold **Cmd** (Mac) to toggle individual layers. The last remaining layer cannot be deselected.
+
+To remove one or more layers, select them and press **Delete** or **Backspace**, or click **Remove layer** in the inspector. A confirmation dialog lists the layers being removed.
+
+---
+
+## Center canvas
+
+The canvas shows the full network as a vertical flow: dataset source → tensor shape → first layer → shape → … → final shape.
+
+Each layer card shows:
+- The layer type (small, uppercase)
+- The key parameters (monospace, prominent)
+
+The tensor shape between each pair of layers is computed locally by the app — no worker call needed. If a shape is inconsistent (for example, a Dense layer whose `inFeatures` does not match the previous layer's output), the connection and the card turn red and an error message appears inline.
+
+**Navigation:**
+- **Pinch** to zoom in and out (trackpad)
+- **Two-finger scroll** to pan
+- **Drag** anywhere on the canvas background to pan
+- **Double-click** the background to reset zoom and position
+
+Zoom buttons and a Reset button are in the toolbar above the canvas. The zoom range is 20–250%.
+
+**Layer selection from the canvas:** Clicking a layer card on the canvas selects it, exactly as clicking its row in the left sidebar does. The two panels stay in sync.
+
+---
+
+## Encoder toolbar
+
+The encoder toolbar sits between the view header and the canvas. It configures how the dataset is converted into spike trains.
+
+| Control | Description |
+|---|---|
+| **Type** | `rate`, `latency`, or `delta`. Applies only to Own values. See [Encoder](/app/encoder). |
+| **T** | Number of timesteps per recording. Directly controls the time dimension of every tensor in the network. |
+| **Seed** | Seed for weight initialization, training shuffle order, and rate draws. The same seed always produces the same run. |
+| **Threshold** | Only visible when Type is `delta`. The firing threshold for the delta encoder. |
+
+<Warning>
+For spike datasets (SHD, N-MNIST, DVS Gesture, CIFAR10-DVS), the **Type** field has no effect. These datasets are already spike recordings. Thrindex bins them into **T** timesteps — that is the only encoder parameter that applies.
+</Warning>
+
+The note below the toolbar explains this when a spike dataset is selected.
+
+---
+
+## Shape annotations
+
+Every tensor shown in the canvas has a shape annotation. The format is:
+
+| Shape | Annotation | Meaning |
+|---|---|---|
+| 1D | `T × 700` | T timesteps, 700 features |
+| 3D | `T × 2 × 128 × 128` | T timesteps, 2 channels, 128×128 spatial |
+
+`T` in the annotation resolves to the current encoder T value.
+
+Shape inference mirrors the THRINDEX SDK's `build_model` logic. It runs in the renderer without calling the Python worker, so it updates as you type.
+
+---
+
+## Right panel (Inspector)
+
+The inspector appears on the right side of the Network view when a project is open.
+
+- **One layer selected** — shows all editable parameters for that layer type
+- **Multiple layers selected** — shows the count and a remove button
+- **No layer selected** — shows a prompt to select a layer
+
+All fields commit on blur or Enter. Invalid values flash briefly then revert.
+
+See [Layers](/app/layers) for the full parameter reference per layer type.
+
+The inspector panel is resizable. Drag the left edge to widen it. Double-click the edge to reset to the default width. The width is stored per machine between sessions.

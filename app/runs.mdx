@@ -1,0 +1,101 @@
+---
+title: "Runs"
+description: "Browse completed training runs, read the manifest, and simulate an artifact."
+---
+
+The **Runs** view lists every completed training run for the current project. Each run is a subdirectory under `runs/` in the project folder.
+
+---
+
+## Run list
+
+The left sidebar shows all runs in reverse-chronological order. Each row shows:
+
+- **Run ID** — the UTC timestamp in short form (`Nov 17 · 19:05`)
+- **Device** — which hardware the run trained on
+- **Last metrics** — accuracy from the final epoch, if available
+
+Click a row to select the run. The main panel shows the full metrics history. The right panel shows the run manifest.
+
+---
+
+## Run ID
+
+Each run is identified by its folder name, which is the UTC start timestamp:
+
+```
+2026-11-17T19-05-01Z
+```
+
+The app displays this as `Nov 17 · 19:05`. The raw folder name is shown when you hover the display form. You can find the folder in the **Files** view using the same name.
+
+If two runs start within the same second (unusual), the second one gets a `-2` suffix: `2026-11-17T19-05-01Z-2`.
+
+---
+
+## Main panel — metrics history
+
+Selecting a run loads its `metrics.jsonl` file and renders the full training history:
+
+- Confusion matrix (if the run used a held-out split)
+- Spike raster from the last epoch (LIF layers only)
+- Accuracy chart (training, held-out if available)
+- Loss chart
+
+These are the same visualizations shown live during training.
+
+---
+
+## Right panel — run manifest
+
+The manifest comes from `manifest.json` written at the end of each run.
+
+| Field | Description |
+|---|---|
+| **SDK version** | THRINDEX SDK version that produced this run |
+| **Device** | Hardware used (`Apple GPU`, `CPU`, etc.) |
+| **Optimizer** | Always `adam` in the current version |
+| **Gradient clip** | Gradient norm clipping value (always `5.0`) |
+| **Split** | Whether the run used a train/test split (`train` or `all`) |
+| **Seed** | The encoder seed used for weight initialization and shuffling |
+
+The manifest is a permanent record of the conditions under which the model was trained. It does not include hyperparameters (those are in the project snapshot stored inside the same file).
+
+---
+
+## Simulation
+
+Each sealed run contains a `model.thx` artifact. You can run the THRINDEX behavioral simulator on this artifact from the **Runs** view.
+
+Click **Simulate** (bottom of the sidebar when a run is selected). The worker loads the artifact and runs one sample from the training split through the full forward pass.
+
+The simulation result appears in the main panel alongside the spike raster:
+
+| Output | Description |
+|---|---|
+| Prediction | Predicted class index and score |
+| Spike raster | Spike activity in each LIF layer for the simulated sample |
+| Output class | The class of the sample that was simulated |
+
+Simulation uses the same seed as training for reproducibility.
+
+<Note>
+Simulation is available on sealed runs — runs that completed and produced a `model.thx` file. Runs that were stopped before the final step do not have an artifact and cannot be simulated.
+</Note>
+
+---
+
+## Run files
+
+The **Files** view gives direct access to the files inside any run folder. Navigate to `runs/` and then into the run ID directory to see:
+
+```
+metrics.jsonl       one JSON line per epoch
+manifest.json       training metadata
+model.thx           compiled artifact
+preview/
+  confusion.json    confusion matrix
+  raster.json       spike raster
+```
+
+You can open `model.thx` directly in the Files view and simulate it from there as well.

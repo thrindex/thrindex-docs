@@ -1,0 +1,89 @@
+---
+title: "Encoder"
+description: "How continuous values are converted into spike trains before entering the network."
+---
+
+The encoder sits between the raw dataset and the first layer of the network. It converts input values into binary spike trains of length **T** timesteps.
+
+Configure the encoder in the toolbar at the top of the **Network** view.
+
+---
+
+## Encoder types
+
+### Rate
+
+Each input value `v ∈ [0, 1]` is treated as a firing probability. At each of the T timesteps, a Bernoulli draw determines whether the neuron fires.
+
+```
+spike[t] = Bernoulli(v)   for t = 1 … T
+```
+
+The seed controls these random draws. The same seed always produces the same spike pattern for the same input.
+
+Rate coding is the default. It is appropriate when input values represent normalized activation levels or intensities.
+
+### Latency
+
+Each input value determines the first timestep at which the neuron fires. Larger values fire earlier; smaller values fire later or not at all within the T timesteps.
+
+```
+t_fire = round((1 − v) * T)
+spike[t] = 1   if t == t_fire,  else 0
+```
+
+Latency coding encodes information in spike timing rather than spike count. It tends to produce sparse spike trains.
+
+### Delta
+
+The neuron fires at timestep `t` when the absolute change in value from `t−1` to `t` exceeds the threshold:
+
+```
+spike[t] = |v[t] − v[t−1]| > threshold
+```
+
+Delta coding is suited to time-series inputs where changes are more informative than absolute values.
+
+The **Threshold** field appears in the encoder toolbar only when **delta** is selected.
+
+---
+
+## T — number of timesteps
+
+T controls the temporal resolution of the encoding. It directly determines the first dimension of every tensor in the network.
+
+For spike datasets, T is the number of bins the recording is divided into. SHD recordings are approximately 1.4 s long; at T = 100, each bin is 14 ms.
+
+Larger T preserves more temporal detail but increases training time proportionally.
+
+---
+
+## Important: spike datasets ignore the encoder type
+
+For the four built-in spike datasets (SHD, N-MNIST, DVS Gesture, CIFAR10-DVS) and own-events NPY files, the input is already a binary spike recording. The encoder **type** (rate, latency, delta) has no effect. Only **T** applies: it sets how many timesteps each recording is binned into.
+
+The app shows a note below the encoder toolbar when a spike dataset is selected:
+
+> *This dataset is already spikes, so the type does not encode it again. T is how many bins each recording is divided into.*
+
+The encoder type only takes effect when the dataset is **Own values** — a file of continuous floating-point values that the encoder converts to spikes.
+
+---
+
+## Seed
+
+The seed initializes three things:
+
+1. The random weight initialization for all Dense and Conv2d layers
+2. The epoch shuffle order (which samples the training loop sees first)
+3. The Bernoulli draws for rate encoding
+
+Fixing the seed makes training reproducible. The seed is recorded in the run manifest so every run documents the exact initialization it used.
+
+---
+
+## dt
+
+The simulation timestep is fixed at **1 ms**. This determines the relationship between `tau_mem` in milliseconds and the dimensionless leak factor `alpha = exp(−1 / tau_mem)`.
+
+dt cannot be changed from the app. It appears as a read-only label in the encoder toolbar.

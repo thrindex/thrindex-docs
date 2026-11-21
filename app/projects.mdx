@@ -1,0 +1,105 @@
+---
+title: "Projects"
+description: "How projects are structured, created, and managed."
+---
+
+## What is a project
+
+A project is an ordinary directory on your machine. Thrindex reads and writes one file at the top level, `project.json`, and creates a `runs/` subdirectory when the first training job completes.
+
+```
+my-project/
+├── project.json        # network architecture, encoder settings, training hyperparameters
+└── runs/
+    ├── 2026-11-17T19-05-01Z/
+    │   ├── metrics.jsonl       # one JSON line per epoch: epoch, loss, trainAccuracy, heldOutAccuracy
+    │   ├── manifest.json       # SDK version, device, optimizer, seed, project snapshot
+    │   ├── model.thx           # compiled artifact — sealed, self-contained
+    │   └── preview/
+    │       ├── confusion.json  # confusion matrix (held-out set, if split was used)
+    │       └── raster.json     # spike raster from the last epoch
+    └── 2026-11-18T10-23-44Z/
+        └── …
+```
+
+The folder can be opened in any file manager, committed to version control, or copied to another machine.
+
+---
+
+## Creating a project
+
+**From the start screen:**
+
+1. Click **New project**.
+2. Click to choose a parent directory.
+3. Enter a project name and click **Create**.
+
+Thrindex creates the directory and writes an initial `project.json` with a default network (empty stack, rate encoder, `T = 25`, learning rate `0.001`, batch size `32`, 30 epochs).
+
+**Opening an existing folder:**
+
+Click **Open folder** and select any directory that contains a `project.json`.
+
+---
+
+## Recent projects
+
+The start screen lists recently opened projects. Click a name to reopen the folder directly. The list is stored locally; it updates whenever you open or create a project.
+
+---
+
+## Code projects
+
+If a project directory contains a `model.py` file, Thrindex treats it as a code project. The form-based network designer shows the architecture from the file, but the **Train** button is disabled with the message:
+
+> `model.py` is in this project. Training from code is not connected to the form stack.
+
+Code projects are for researchers using the THRINDEX Python SDK directly. The app shows runs and files from these projects; it does not modify `model.py` or run it.
+
+---
+
+## project.json structure
+
+The file is written by Thrindex and versioned alongside your project. You can inspect it, but editing it by hand is not recommended — use the app controls instead.
+
+```json
+{
+  "format": "thrindex/1",
+  "name": "my-project",
+  "network": {
+    "encoder": {
+      "kind": "rate",
+      "T": 100,
+      "seed": 1
+    },
+    "dtMs": 1,
+    "layers": [
+      { "type": "Dense", "inFeatures": 700, "outFeatures": 512 },
+      { "type": "LIF",   "threshold": 1.0,  "tauMem": 20 },
+      { "type": "Dense", "inFeatures": 512, "outFeatures": 20 },
+      { "type": "LIF",   "threshold": 1.0,  "tauMem": 20 }
+    ]
+  },
+  "train": {
+    "loss": "rate",
+    "lr": 0.001,
+    "batchSize": 32,
+    "epochs": 30
+  },
+  "data": {
+    "kind": "shd"
+  }
+}
+```
+
+---
+
+## Run IDs
+
+Each training run is stored in a subdirectory named by the UTC start time:
+
+```
+2026-11-17T19-05-01Z
+```
+
+The app displays this as `Nov 17 · 19:05`. The raw folder name is shown in the **Files** view and used as the identifier everywhere in the **Runs** view.

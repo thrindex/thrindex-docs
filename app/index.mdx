@@ -1,0 +1,48 @@
+---
+title: "Thrindex App"
+description: "Design and train spiking neural networks locally on your Mac."
+sidebarTitle: "Overview"
+mode: "wide"
+paginationNavigation: false
+---
+
+Thrindex is a macOS desktop application for designing, training, and inspecting spiking neural networks. Everything runs on your machine — your data never leaves, and training uses your hardware directly.
+
+<CardGroup cols={3}>
+  <Card title="Visual network designer" icon="diagram-project">
+    Build an SNN architecture by adding and connecting layers. Live tensor shape annotations update as you edit.
+  </Card>
+  <Card title="Local training" icon="microchip">
+    Training runs on Apple GPU (MPS), NVIDIA GPU, or CPU. Metrics stream to the app epoch by epoch.
+  </Card>
+  <Card title="Run history" icon="clock-rotate-left">
+    Every completed run is stored with its manifest, metrics, spike raster, and compiled artifact.
+  </Card>
+</CardGroup>
+
+## Five views
+
+The activity bar on the left switches between the five views. All work on the same project folder.
+
+| View | What it does |
+|---|---|
+| **Network** | Design the layer stack, configure the encoder, inspect layer parameters |
+| **Data** | Select and install the training dataset |
+| **Train** | Start training, watch live loss and accuracy curves |
+| **Runs** | Browse completed runs, read the manifest, run simulation |
+| **Files** | Browse every file in the project folder, open artifacts |
+
+## What stays on your machine
+
+Thrindex does not upload weights, datasets, or runs anywhere. The project folder is an ordinary directory. Training writes to `runs/` inside that folder. You can copy, back up, or delete it like any other directory.
+
+An account is required to train. Sign-in verifies your identity once at startup; training proceeds without a network connection after that.
+
+<CardGroup cols={2}>
+  <Card title="Getting started" href="/app/getting-started">
+    Install the app, sign in, and run your first training job.
+  </Card>
+  <Card title="Network" href="/app/network">
+    How the network designer, encoder, and shape flow work.
+  </Card>
+</CardGroup>

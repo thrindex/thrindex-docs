@@ -31,7 +31,49 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "Docs",
+        "tab": "App",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "app/index",
+              "app/getting-started",
+              "app/projects"
+            ]
+          },
+          {
+            "group": "Network",
+            "pages": [
+              "app/network",
+              "app/layers",
+              "app/encoder"
+            ]
+          },
+          {
+            "group": "Data",
+            "pages": [
+              "app/data",
+              "app/own-data"
+            ]
+          },
+          {
+            "group": "Training",
+            "pages": [
+              "app/training",
+              "app/runs"
+            ]
+          },
+          {
+            "group": "Settings & Account",
+            "pages": [
+              "app/compute",
+              "app/account"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "SDK",
         "groups": [
           {
             "group": "Getting Started",

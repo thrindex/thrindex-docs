@@ -1,0 +1,112 @@
+---
+title: "Getting Started"
+description: "Create an account, install the app, and run your first training job."
+---
+
+## Requirements
+
+- Apple Silicon Mac (M1 or later)
+- macOS Ventura or later
+- An internet connection for the initial sign-in and dataset download
+
+Training itself runs entirely offline after setup.
+
+---
+
+## 1. Create an account
+
+Go to [thrindex.com](https://thrindex.com) and create an account. You will receive a confirmation email — open it before continuing.
+
+An account gates training. Opening projects, browsing runs, and inspecting files work without signing in.
+
+---
+
+## 2. Install the app
+
+Download the disk image from the Thrindex website. Open the `.dmg`, drag Thrindex into Applications, and launch it.
+
+The first time you open the app, macOS may show a security prompt. This is expected for newly installed applications.
+
+---
+
+## 3. Sign in
+
+Click the circular avatar at the bottom of the activity bar (left edge of the window), then click **Sign in**. Your default browser opens to the Thrindex sign-in page.
+
+After signing in, the browser shows "Opening Thrindex" and the app receives your session. The avatar shows your initials when sign-in is complete.
+
+<Tip>
+Training is blocked until you sign in. All other views are available immediately on project open.
+</Tip>
+
+---
+
+## 4. Create a project
+
+A project is a folder. Thrindex reads and writes `project.json` in that folder and stores training runs in `runs/`.
+
+1. Click **New project** on the start screen.
+2. Choose a parent directory.
+3. Enter a project name and click **Create**.
+
+The project opens on the **Network** view.
+
+To open an existing project folder, click **Open folder** and select the directory.
+
+---
+
+## 5. Install a dataset
+
+Switch to the **Data** view using the second icon in the activity bar. Select **SHD** from the list. Click **Install** to download the dataset to your machine.
+
+SHD is a good starting point: 700-channel cochlear spike recordings, 20 spoken digit classes, ~170 MB total.
+
+The dataset downloads once and is shared across all projects on your machine.
+
+---
+
+## 6. Build a network
+
+Switch to the **Network** view. Add layers from the left sidebar:
+
+1. Click **Dense** → set In features to `700`, Out features to `512`
+2. Click **LIF** → leave the defaults (`threshold 1.0`, `tau_mem 20 ms`)
+3. Click **Dense** → set In features to `512`, Out features to `20`
+4. Click **LIF** → leave the defaults
+
+Set **T** to `100` in the encoder toolbar at the top of the canvas. This bins each 1.4 s SHD recording into 100 timesteps.
+
+The shape diagram updates as you edit. A green path from input to output means the architecture is consistent.
+
+---
+
+## 7. Train
+
+Switch to the **Train** view. The left sidebar shows the training settings.
+
+Recommended starting values for SHD:
+
+| Setting | Value |
+|---|---|
+| Learning rate | `0.001` |
+| Batch size | `32` |
+| Epochs | `20` |
+
+Click **Train**. The first epoch may take a few seconds to start while the dataset is loaded. Loss and accuracy curves appear as each epoch completes.
+
+<Tip>
+Watch **held-out accuracy** rather than training accuracy to judge whether the model is learning. Expect a climb after epoch 3–5 on SHD with the architecture above.
+</Tip>
+
+---
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Layers" href="/app/layers">
+    Dense, LIF, Conv2d, and Flatten — full parameter reference.
+  </Card>
+  <Card title="Training" href="/app/training">
+    Training settings, live metrics, and what to watch for.
+  </Card>
+</CardGroup>
