@@ -1,0 +1,99 @@
+---
+title: "Comparing runs"
+description: "Select two or more runs to compare their accuracy curves, energy cost, confusion matrices, and training hyperparameters side by side."
+---
+
+The comparison view activates when two or more runs are selected in the left sidebar. Hold **Cmd** and click additional runs to build a selection. Click a selected run again to deselect it.
+
+Up to six runs can be compared simultaneously. Each run is assigned a distinct color that appears consistently across all charts, tables, and labels in the comparison view.
+
+---
+
+## Summary table
+
+The first section is a table of the final metrics for all selected runs:
+
+| Column | Description |
+|---|---|
+| Run | Run ID in its assigned color |
+| Epochs | Number of completed epochs |
+| Train acc | Final training accuracy |
+| Held-out acc | Final held-out accuracy (if split exists) |
+| Device | Hardware used |
+| Energy | Estimated inference energy (shown when any run has been simulated) |
+
+The energy column appears only when at least one selected run has been simulated from the Simulate tab. Runs that have not been simulated show a dash. The energy value is the synaptic ops estimate from simulation, converted to nJ or uJ using the 0.5 pJ per operation model.
+
+---
+
+## Accuracy chart
+
+Training accuracy curves for all selected runs are overlaid on a single chart. Each run uses its assigned color. Held-out accuracy is shown as a dashed line of the same color.
+
+**Hover interaction:** move the cursor over the chart to see a floating tooltip showing the exact accuracy value for every run at that epoch. For multi-run comparison, this is the most effective way to pinpoint the epoch where runs diverge.
+
+A run that shows training accuracy rising but held-out accuracy flat is overfitting. A run where both curves rise together is generalizing. The overlaid view makes it easy to see whether different hyperparameters produce better generalization.
+
+---
+
+## Loss chart
+
+Loss curves for all selected runs, overlaid in the same color scheme as the accuracy chart. Hover interaction works identically.
+
+---
+
+## Simulation energy
+
+Shown when at least one selected run has been simulated.
+
+Each simulated run is shown as a horizontal bar proportional to its synaptic operation count relative to the highest-energy run in the selection. The absolute energy and operation count appear to the right.
+
+**How to use it:** this chart answers the efficiency question. If two runs have similar held-out accuracy, the one with lower synaptic ops produces the same classification quality at lower energy on neuromorphic hardware. The accuracy vs energy trade-off is immediately visible by reading the accuracy chart and energy chart together.
+
+Lower synaptic ops typically come from networks with more aggressive LIF thresholds (fewer neurons fire) or fewer hidden units.
+
+---
+
+## Confusion matrices
+
+Shown when at least one selected run has a held-out split. Each matrix is labeled with its run's color and ID.
+
+Side-by-side confusion matrices answer the error diversity question: do different runs make the same mistakes, or different ones? Two runs with identical held-out accuracy but different confusion patterns have learned different features. This is relevant for ensemble methods and for understanding whether architectural changes are actually causing the network to learn differently.
+
+Each matrix is row-normalized (each row sums to 1.0). A bright diagonal means high accuracy on that class; bright off-diagonal cells reveal specific class confusions.
+
+---
+
+## Hyperparameter comparison
+
+Shown for all selected runs.
+
+| Column | Description |
+|---|---|
+| Run | Run ID in its assigned color |
+| LR | Learning rate used |
+| Batch | Batch size |
+| Epochs | Trained / planned (shows both when early stopping triggered) |
+| Seed | Encoder seed - affects weight init and shuffle order |
+| LR schedule | `none` or `cosine` |
+| Early stop | Patience (epochs) if configured, dash otherwise |
+| Val split | Validation fraction if configured (e.g. `20%`), dash otherwise |
+
+**When early stopping triggered:** the Epochs cell shows `15 / 100` - the number trained over the number planned. This immediately identifies which runs stopped early.
+
+The seed column is particularly important for reproducibility analysis: two runs with identical hyperparameters but different seeds show the variance attributable to random initialization, not to architecture or training choices.
+
+---
+
+## Workflow example
+
+A typical comparison session for SHD hyperparameter search:
+
+1. Train 3-4 runs with different learning rates or layer sizes
+2. Hold **Cmd** and click all of them in the sidebar
+3. The accuracy chart shows which configuration converged fastest and to the highest held-out accuracy
+4. Simulate each run with sample index 0 to populate energy data
+5. The energy section shows whether the more accurate model is also more efficient
+6. The hyperparameter table confirms you are reading the right runs in the right colors
+
+This takes under a minute and replaces manual comparison across separate files.

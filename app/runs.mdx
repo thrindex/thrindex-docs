@@ -1,6 +1,6 @@
 ---
 title: "Runs"
-description: "Browse completed runs, read the manifest, interpret the raster and confusion matrix, and simulate an artifact."
+description: "Browse completed training runs, analyse results across three dedicated tabs, and export models for inference."
 ---
 
 The **Runs** view lists every completed training run for the current project. Each run is a subdirectory under `runs/` in the project folder.
@@ -15,7 +15,9 @@ The left sidebar shows all runs in reverse-chronological order. Each row shows:
 - **Device** - which hardware the run trained on
 - **Last metrics** - accuracy from the final epoch, if available
 
-Click a row to select the run. The main panel shows the full metrics history. The right panel shows the run manifest.
+Click a row to select it. The main panel opens on the **Training** tab.
+
+**Selecting multiple runs** opens the [comparison view](/app/compare). Hold Cmd (Mac) and click additional runs to add them to the selection. Click any selected run again to deselect it. When two or more runs are selected, the main panel switches to side-by-side comparison automatically.
 
 ---
 
@@ -29,106 +31,223 @@ Each run is identified by its folder name - the UTC start timestamp:
 
 The app displays this as `Nov 17 · 19:05`. Hover the displayed form to see the raw folder name. You can find the folder in the **Files** view using the same name.
 
-If two runs start within the same second, the second gets a `-2` suffix: `2026-11-17T19-05-01Z-2`.
+---
+
+## Header buttons
+
+The run header contains persistent action buttons visible regardless of which tab is active:
+
+| Button | Action |
+|---|---|
+| **Open folder** | Opens the run directory in Finder |
+| **Export** | Creates a reproducibility package - see below |
+| **Code** | Opens a Python code dialog - see below |
 
 ---
 
-## Metrics history
+## Training tab
 
-Selecting a run loads `metrics.jsonl` and renders:
+The Training tab is the default view when a run is selected. It shows the run's training results.
 
-- Confusion matrix (if the run used a held-out split)
-- Spike raster from the last epoch (LIF layers only)
-- Accuracy chart (training accuracy, plus held-out if available)
-- Loss chart
+### Stats row
+
+A compact horizontal summary at the top:
+
+| Field | Description |
+|---|---|
+| Device | Hardware used for training |
+| Epochs | Number of completed epochs |
+| Train acc | Final training accuracy |
+| Val acc | Final held-out accuracy (shown only if a held-out split exists) |
+| Final loss | Loss at the last epoch |
+| Status | `Sealed` when a `model.thx` artifact was produced |
+
+If training was stopped early (via early stopping or the Cancel button), the epochs count reflects how many actually completed. The planned count is in the manifest.
+
+### Accuracy and loss charts
+
+The accuracy and loss charts show the full training history. Both charts support **hover interaction**: move the cursor over the chart to see a floating tooltip showing the exact value at that epoch for every series. This is particularly useful when comparing training accuracy against held-out accuracy.
+
+The accuracy chart includes a dashed midline at 50% as a reference.
+
+### Confusion matrix
+
+Shown when the run used a held-out split. Rows are the true class; columns are the predicted class. Values are row-normalized (each row sums to 1.0).
+
+A well-trained model shows a bright diagonal and near-zero off-diagonal values. For SHD, early-training confusion between English and German digits (classes 10-19) is common.
+
+### Literature baselines
+
+For built-in benchmark datasets (SHD, N-MNIST, DVS Gesture), a baselines bar chart compares your run's held-out accuracy against published results from the neuromorphic literature. Each bar is labeled with the method name and year.
+
+Your result is highlighted. If your bar is shorter than the published results, the gap gives a concrete target for architecture or hyperparameter improvements.
+
+<Note>
+Baselines are only shown when a held-out accuracy exists. CIFAR10-DVS does not have a standard test split and therefore does not show baselines.
+</Note>
+
+---
+
+## Simulate tab
+
+The Simulate tab runs the sealed `model.thx` artifact through the THRINDEX behavioral simulator on a recording of your choice.
+
+### Sample picker
+
+The sample picker selects which recording from the training split to feed into the simulator. Enter a 0-indexed integer - 0 is the first recording, 1 is the second, and so on.
+
+Click **Simulate** to run the forward pass. The worker loads the artifact, encodes the selected sample, runs it through the simulator, and writes the results to `preview/simulate.json` and `preview/sim_raster.json`.
+
+<Note>
+Simulation requires a sealed run. Runs stopped before training completed do not produce a `model.thx` and cannot be simulated.
+</Note>
+
+### Prediction card
+
+The prediction card shows the model's output for the selected sample:
+
+- **Predicted class** - the output neuron index with the most spikes across all timesteps
+- **Correct / Wrong** - comparison against the true label for that recording
+- **True label** - shown in red when the prediction is wrong
+
+### Simulation stats
+
+| Stat | Description |
+|---|---|
+| Total spikes | All spikes fired by all neurons across the entire forward pass |
+| Output timesteps | T timesteps in the output spike sequence |
+| Synaptic ops | Number of synaptic operations performed during the forward pass |
+| Est. energy | Estimated energy at 0.5 pJ per synaptic operation |
+
+The energy estimate follows the THRINDEX energy model: each synaptic operation costs 0.5 pJ. This is an order-of-magnitude estimate consistent with published SNN hardware efficiency numbers, not a measurement on physical silicon.
+
+### Output neuron activity
+
+A horizontal bar chart showing the total spike count for each output neuron over the entire simulated sequence. The predicted class (highest bar) is highlighted. The true-label neuron is marked when it differs from the prediction.
+
+This chart makes it immediately clear how decisive the model's prediction was. A sharp contrast between the predicted class bar and the others indicates a confident prediction; bars of similar height indicate uncertainty.
+
+### Output spike raster
+
+A per-timestep visualization of the output neuron spikes. X-axis is timestep; Y-axis is output neuron index. Each dot is a spike.
+
+This raster shows the raw temporal dynamics of the model's output layer - when different output neurons fire over the course of the forward pass. A well-trained model typically shows the correct class neuron firing more densely and earlier than incorrect classes.
+
+---
+
+## Diagnostics tab
+
+The Diagnostics tab shows internal training-time diagnostics recorded from the last epoch. These are useful for identifying pathological training behaviour - dead neurons, saturated layers, or layers that never fire.
+
+### Layer activity
+
+For each layer in the network:
+
+- **LIF layers** - mean firing rate (percentage of neurons active per timestep) and fraction of silent neurons (neurons that never fired in the sample batch)
+- **Dense and Conv2d layers** - mean current (average pre-spike activation)
+
+A healthy LIF layer has a firing rate between roughly 5% and 40%. Below 5% suggests the threshold is too high or the upstream activations are too small. Above 60-70% suggests the threshold is too low and the layer is saturating.
+
+A high silent fraction (> 50%, marked with a warning) means that most neurons never fire. These neurons contribute nothing to the classification and represent wasted capacity.
+
+### Spike raster
+
+A spike raster for LIF layers from the last epoch's training batch. See [reading the spike raster](#reading-the-spike-raster) below for interpretation guidance.
 
 ---
 
 ## Reading the spike raster
 
-The raster shows the spike output of each LIF layer in the network, for a single sample from the training split (the same sample is used consistently across runs for comparison).
+The raster shows the spike output of each LIF layer for a single batch sample from the training split.
 
 **What to look for:**
 
-A healthy, learning LIF layer shows a **sparse, non-uniform** spike pattern. Some neurons are active at specific timesteps, most are quiet. This is characteristic of a network that has learned to fire selectively in response to the input.
+A healthy, learning LIF layer shows a **sparse, non-uniform** spike pattern - some neurons active at specific timesteps, most quiet. This is characteristic of a network that has learned to fire selectively in response to the input.
 
 **Warning patterns:**
 
 | Pattern | What it means |
 |---|---|
-| Mostly empty (all white) | The LIF layer is silent. Threshold is too high, or the upstream Dense layer is producing small activations. |
+| Mostly empty (all white) | The LIF layer is silent. Threshold is too high, or upstream Dense activations are small. |
 | Fully saturated (all black) | Every neuron fires at every timestep. Threshold is too low. |
-| Uniform noise with no structure | The network has not learned anything. All neurons fire at similar random rates. |
-| Structured but output LIF is empty | The hidden layer is learning, but the output LIF cannot fire. Lower the output threshold. |
-
-After a successful few epochs on SHD, you should see the hidden LIF layer developing sparse structure - columns of active neurons at specific timestep ranges corresponding to the temporal features of the spoken digit.
+| Uniform noise with no structure | The network has not learned anything yet. |
+| Hidden layer structured but output LIF empty | Hidden layer learning, but output LIF cannot fire. Lower the output threshold. |
 
 ---
 
-## Reading the confusion matrix
+## Reproducibility export
 
-The confusion matrix is shown when the run used a held-out split (most built-in datasets). Rows are the true class; columns are the predicted class. Values are row-normalized (each row sums to 1.0).
+The **Export** button (header, sealed runs only) writes a self-contained reproducibility package to a directory you choose:
 
-A well-trained model shows a bright diagonal and near-zero off-diagonal values. Common patterns in early SHD training:
+```
+model.thx           compiled artifact
+manifest.json       training metadata and project snapshot
+metrics.jsonl       epoch-by-epoch loss and accuracy history
+README.md           generated summary with run parameters and final metrics
+```
 
-- Large off-diagonal blocks in the top-left corner: the network is confusing the English digit set
-- Symmetric confusion between pairs (e.g. "one" and "nine"): the network is responding to overall spike count rather than temporal structure
-- One class systematically predicted for everything: the output LIF for that class fires more strongly due to initialization
+This package is everything needed to reproduce the run from scratch using the THRINDEX SDK, share results with colleagues, or archive the model for a publication.
+
+---
+
+## Python code export
+
+The **Code** button (header, sealed runs only) opens a dialog with a Python snippet that runs inference on the sealed artifact using the THRINDEX SDK.
+
+The snippet is pre-filled with:
+- The exact artifact path relative to the project
+- The encoder T value from the manifest
+- The number of input features matching the first layer
+
+Click **Copy** to copy the snippet to your clipboard.
+
+The generated code calls `thrindex._core.run_sim` directly - the same low-level API used by `thrindex run model.thx` and by the app's own simulator. It is real, runnable code.
+
+```python
+# Install first: pip install thrindex
+from thrindex._core import run_sim
+import numpy as np, torch
+
+artifact = "runs/<run-id>/model.thx"
+input_spikes = np.zeros((1, T, n_features), dtype=np.float32)
+# ... fill with your spike data ...
+
+output_spikes, stats, transcript = run_sim(artifact, input_spikes.tolist(), threads=1, seed=0)
+pred = torch.tensor(output_spikes).mean(dim=1).argmax(dim=-1)
+print("Predicted:", pred.tolist())
+```
 
 ---
 
 ## Run manifest
 
-The manifest comes from `manifest.json` written at the end of each run.
+The right panel (always visible alongside the main panel) shows the manifest for the selected run.
 
 | Field | Description |
 |---|---|
 | **SDK version** | THRINDEX SDK version that produced this run |
 | **Device** | Hardware used (`Apple GPU`, `CPU`, etc.) |
 | **Optimizer** | Always `adam` in the current version |
-| **Gradient clip** | Gradient norm clipping value (always `5.0`) |
-| **Split** | `train` when no test split exists, `train+test` otherwise |
-| **Seed** | The encoder seed - controls weight init, shuffle order, and rate draws |
-
-The manifest is an exact record of the training conditions. It is written only after the run completes. Combined with the project snapshot inside `manifest.json`, it contains everything needed to reproduce the run from scratch using the THRINDEX SDK.
-
----
-
-## Simulation
-
-Each completed run contains a `model.thx` artifact - the compiled, sealed SNN. You can run the THRINDEX behavioral simulator on it directly from the Runs view.
-
-Click **Simulate** in the sidebar. The worker loads the artifact and runs one sample from the training split through the full forward pass in the THRINDEX behavioral simulator.
-
-**Simulation outputs:**
-
-| Output | Description |
-|---|---|
-| Prediction | Predicted class index |
-| Output spike raster | Spike activity in each LIF layer during the simulated forward pass |
-| Sample class | The true class of the sample being simulated |
-
-The simulation uses the same seed as training. It is deterministic: running it twice produces the same result.
-
-**What the simulation tells you:** simulation shows the actual computation the compiled artifact performs, independent of the training framework. It confirms the artifact matches the trained model and gives you a detailed view of the spike dynamics at inference time - which neurons fire, when, and how the output class emerges from the spike counts.
-
-<Note>
-Simulation requires a sealed run - one that completed and wrote a `model.thx` file. Runs stopped before completion do not have an artifact.
-</Note>
+| **Gradient clip** | Always `5.0` |
+| **Split** | `test` for datasets with an official test set; `val20` for a 20% custom split; `none` for train-only |
+| **Seed** | Encoder seed - controls weight init, shuffle order, and rate draws |
 
 ---
 
 ## Run files
 
-The **Files** view gives direct access to run contents. Navigate to `runs/` and then into the run ID directory:
+The Files view gives direct access to run contents. Navigate to `runs/` and then into the run ID directory:
 
 ```
-metrics.jsonl       one JSON line per epoch: epoch, loss, trainAccuracy, heldOutAccuracy
-manifest.json       training metadata and project snapshot
-model.thx           compiled artifact - sealed, self-contained
+metrics.jsonl          one JSON line per epoch: epoch, loss, trainAccuracy, heldOutAccuracy
+manifest.json          training metadata and project snapshot
+model.thx              compiled artifact - sealed, self-contained
 preview/
-  confusion.json    confusion matrix over the held-out set
-  raster.json       spike raster data from the last training epoch
+  confusion.json       confusion matrix over the held-out set
+  raster.json          training spike raster from the last epoch
+  rates.json           per-layer firing rates and silent fractions
+  simulate.json        simulation stats (written after Simulate is run)
+  sim_raster.json      output spike raster from simulation
 ```
 
-You can open `model.thx` directly in the **Files** view and run simulation from there.
+You can open `model.thx` directly in the Files view and run simulation from there.

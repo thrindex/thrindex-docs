@@ -81,6 +81,28 @@ Change the encoder type and threshold in the **Network** view encoder toolbar.
 
 ---
 
+## Validation split
+
+If you do not have separate test files, you can configure a **validation split** directly in the Data panel. The split percentage appears below the file status rows when no test files are present.
+
+| Setting | Effect |
+|---|---|
+| `0%` (default) | All recordings are used for training. No held-out accuracy is reported. |
+| `1-50%` | That fraction of recordings is held out for validation. |
+
+The split is applied using a seeded random permutation (using the same seed as training) so it is reproducible across runs with the same project settings. The held-out fraction is recorded in the manifest as `"split": "val20"` (for 20%) so you can always trace which recording subset was used for evaluation.
+
+A configured validation split enables:
+- Held-out accuracy per epoch in the training charts
+- Confusion matrix after training
+- Early stopping based on held-out accuracy improvement
+
+<Note>
+If you later add `spikes_test.npy` and `labels_test.npy` to your folder, the test files take priority and the validation split setting is ignored.
+</Note>
+
+---
+
 ## Network input shape
 
 For own events, the first Dense or Conv2d layer must match the actual shape of your recordings. The shape diagram shows "unknown" for own-data inputs until you run Import; after that it reflects the actual dimensions read from your files.

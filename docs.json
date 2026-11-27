@@ -57,10 +57,12 @@
             ]
           },
           {
-            "group": "Training",
+            "group": "Training & Analysis",
             "pages": [
               "app/training",
-              "app/runs"
+              "app/runs",
+              "app/simulate",
+              "app/compare"
             ]
           },
           {

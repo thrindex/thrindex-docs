@@ -1,0 +1,121 @@
+---
+title: "Simulation"
+description: "Run the THRINDEX behavioral simulator on a sealed model artifact to verify inference, analyse output spike dynamics, and estimate hardware energy cost."
+---
+
+Simulation runs a compiled `model.thx` artifact through the THRINDEX behavioral simulator - the same deterministic Rust-based simulator used by `thrindex run model.thx` on the command line. It is a full forward pass on real data, not an approximation.
+
+Simulation is available from the **Simulate tab** of any sealed run in the **Runs** view.
+
+---
+
+## What simulation does
+
+The simulator takes a spike input, runs it through every layer of the compiled network following the exact arithmetic specified in the artifact, and returns:
+
+1. The output spike sequence `[T, n_output_neurons]`
+2. Statistics: total spike count, synaptic operations, wall time
+3. A transcript of the simulator internals
+
+The app uses the output spike sequence to determine the **predicted class** (argmax of per-neuron spike counts over T), and stores both the aggregate stats and the full output raster for display.
+
+---
+
+## Selecting a sample
+
+The sample picker at the top of the Simulate tab is a 0-indexed integer referring to recordings in the training split.
+
+- `0` is the first training recording (default)
+- `1` is the second, and so on
+
+The training split used is the one the run was trained on - recorded in the manifest. If the run used a 20% validation split, the "training split" here means the 80% used for training, not the held-out 20%.
+
+<Note>
+If you enter an index beyond the number of recordings in the training split, the app shows an error with the valid range.
+</Note>
+
+Click **Simulate** to start.
+
+---
+
+## Prediction card
+
+After simulation completes, the prediction card shows:
+
+| Element | Description |
+|---|---|
+| **Predicted class** | Output neuron index with the most spikes across all T timesteps |
+| **Correct / Wrong** | Comparison against the true label for the selected recording |
+| **True label** | Shown next to "Wrong" when the prediction is incorrect |
+| **Input description** | Which recording was used (e.g. "Training recording 3, label 7") |
+
+A correct prediction means the output neuron for the right class fired more than all others. A wrong prediction means another output neuron fired more. The neuron activity chart below shows exactly how close the prediction was.
+
+---
+
+## Simulation stats
+
+| Stat | Description |
+|---|---|
+| **Total spikes** | Sum of all spikes across all neurons and all timesteps |
+| **Output timesteps** | T in the output sequence |
+| **Synaptic ops** | Number of multiply-accumulate operations performed by the simulator |
+| **Est. energy** | Synaptic ops x 0.5 pJ, in nJ or uJ |
+
+**On the energy estimate:** 0.5 pJ per synaptic operation is derived from published neuromorphic hardware efficiency numbers (Intel Loihi 2: ~2 pJ; BrainScaleS: order-of-magnitude consistent). It is an order-of-magnitude estimate, not a measurement. Use it for relative comparisons between architectures or as a proxy for hardware efficiency, not as an absolute energy budget.
+
+Lower synaptic ops for the same accuracy is always better. Reducing firing rates (by increasing LIF thresholds) is the most direct way to reduce synaptic ops.
+
+---
+
+## Output neuron activity
+
+A horizontal bar chart showing the total spike count for each output neuron across all T timesteps.
+
+Each bar corresponds to one output class. The predicted class (highest spike count) is highlighted. The true-label neuron is marked when it differs from the prediction.
+
+**What to look for:**
+
+- **Sharp contrast** (one bar much taller than the others): the model is confident
+- **Multiple similar-height bars**: the model is uncertain; the highest wins but only by a small margin
+- **All bars at 0**: the output layer never fired. The LIF threshold is too high or the network was not trained to convergence. Try lowering the output LIF threshold.
+
+---
+
+## Output spike raster
+
+A per-timestep visualization of which output neurons fired and when. X-axis is timestep; Y-axis is output neuron index.
+
+This is the raw temporal signal the classifier is built on. The app converts the temporal raster into a class prediction by counting total spikes per neuron, but the raster shows the full dynamics.
+
+**On multi-class temporal patterns:** in a well-trained SHD network, you will often see the correct class neuron firing in bursts at specific timestep ranges corresponding to the temporal features of the input. The incorrect class neurons may fire sporadically but with lower total counts.
+
+---
+
+## Running inference from Python
+
+For inference outside the app, use the THRINDEX SDK's `run_sim` function. Click **Code** in the run header to get a pre-filled snippet.
+
+The snippet uses the exact artifact path, T value, and feature dimensions from the run's manifest. See the [CLI reference](/api/cli) for the `thrindex run` command-line equivalent.
+
+---
+
+## Determinism
+
+Simulation is deterministic given the same artifact and seed. Running the same sample twice produces identical output. This is by design: the THRINDEX simulator has zero internal randomness. All stochasticity is in the encoder (which is applied before simulation), not in the simulator itself.
+
+The seed used in the generated Python code snippet is `0` by default. If you want to exactly reproduce the app's simulation result, use the training seed from the run manifest.
+
+---
+
+## Files written
+
+After simulation:
+
+```
+preview/
+  simulate.json    prediction, stats, sample description
+  sim_raster.json  output spike raster [T, n_output_neurons] in spike-pair format
+```
+
+Both files are written atomically. If simulation fails, neither file is written.
